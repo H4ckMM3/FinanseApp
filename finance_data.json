@@ -1,0 +1,33 @@
+{
+  "salary": 50000.0,
+  "current_money": 40000.0,
+  "transactions": [
+    {
+      "type": "expense",
+      "amount": 25000.0,
+      "description": "Оплата квартплаты",
+      "date": "2025-09-23 22:10"
+    },
+    {
+      "type": "expense",
+      "amount": 25000.0,
+      "description": "Оплата квартплаты",
+      "date": "2025-09-23 22:13"
+    }
+  ],
+  "goals": [
+    {
+      "name": "Сессия",
+      "amount": 20000.0,
+      "date": "2025-12-01"
+    }
+  ],
+  "monthly_budget": {},
+  "goal_investments": {},
+  "salary_dates": [
+    8,
+    22
+  ],
+  "rent": 25000.0,
+  "rent_paid_until": "2025-10-01"
+}
