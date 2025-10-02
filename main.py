@@ -1,5 +1,5 @@
 import flet as ft
-import datetime
+from datetime import datetime, timedelta
 import json
 import os
 from typing import Dict, List, Optional
@@ -114,73 +114,837 @@ class MainApp:
         self.page.update()
     
     def create_home_page(self):
-        current_date = datetime.datetime(2025, datetime.datetime.now().month, datetime.datetime.now().day)
-        salary = self.finance_app.data["salary"]
         current_money = self.finance_app.data["current_money"]
-        
-        next_salary_date = self.get_next_salary_date()
-        days_until_salary = (next_salary_date - current_date).days
-        
+        safety_reserve = self.finance_app.data["safety_reserve"]
+        free_money = current_money - safety_reserve
         daily_budget = self.calculate_daily_budget()
+        days_until_salary = self.calculate_days_until_salary(self.finance_app.data["salary_dates"][0])
+        
+        # Получаем данные для текущего месяца
+        current_month_income = self.get_current_month_income()
+        current_month_expenses = self.get_current_month_expenses()
+        month_balance = current_month_income - current_month_expenses
+        
+        # Получаем информацию о целях
+        goals = self.finance_app.data["goals"]
+        goal_investments = self.finance_app.data["goal_investments"]
+        total_goals = sum(goal["amount"] for goal in goals)
+        total_invested = sum(goal_investments.values())
+        remaining_goals = total_goals - total_invested
+        
+        # Получаем дни рождения на текущий месяц
+        current_month = datetime.now().month
+        current_birthdays = self.get_birthdays_for_month(current_month)
+        
+        # Создаем предупреждения и рекомендации
+        warnings = []
+        recommendations = []
+        
+        if free_money < 5000:
+            warnings.append("⚠️ Критически мало свободных денег")
+        elif free_money < 10000:
+            warnings.append("⚠️ Мало свободных денег")
+        
+        if daily_budget < 500:
+            warnings.append("⚠️ Очень маленький дневной бюджет")
+        elif daily_budget < 1000:
+            warnings.append("⚠️ Маленький дневной бюджет")
+        
+        if month_balance < 0:
+            warnings.append("⚠️ Отрицательный баланс месяца")
+        elif month_balance < 5000:
+            warnings.append("⚠️ Низкий баланс месяца")
+        
+        if days_until_salary > 20:
+            recommendations.append("💡 До зарплаты еще долго - экономьте")
+        elif days_until_salary < 3:
+            recommendations.append("💡 Скоро зарплата - можно немного потратить")
         
         return ft.Column([
-            ft.Text("Добро пожаловать в ваше финансовое приложение!", 
-                   size=24, weight=ft.FontWeight.BOLD),
-            ft.Divider(),
+            # Заголовок с датой и днем недели
+            ft.Container(
+                content=ft.Row([
+                    ft.Text(f"📅 {datetime.now().strftime('%d %B %Y')}", size=24, weight=ft.FontWeight.BOLD),
+                    ft.Container(expand=True),
+                    ft.Text(f"📅 {datetime.now().strftime('%A')}", size=18, color=ft.Colors.GREY_600)
+                ]),
+                padding=20,
+                bgcolor=ft.Colors.BLUE_50,
+                border_radius=10
+            ),
             
+            # Основная статистика - два столбца
+            ft.Row([
+                # Финансы
+                ft.Card(
+                    content=ft.Container(
+                        content=ft.Column([
+                            ft.Text("💰 Финансы", size=20, weight=ft.FontWeight.BOLD),
+                            ft.Divider(),
+                            ft.Text(f"Всего денег: {current_money:,.0f} ₽", size=16, weight=ft.FontWeight.BOLD),
+                            ft.Text(f"Свободно: {free_money:,.0f} ₽", size=14, color=ft.Colors.GREEN),
+                            ft.Text(f"Резерв безопасности: {safety_reserve:,.0f} ₽", size=14, color=ft.Colors.BLUE)
+                        ], spacing=10),
+                        padding=20
+                    ),
+                    expand=1
+                ),
+                
+                # Текущий месяц
+                ft.Card(
+                    content=ft.Container(
+                        content=ft.Column([
+                            ft.Text("📊 Текущий месяц", size=20, weight=ft.FontWeight.BOLD),
+                            ft.Divider(),
+                            ft.Text(f"Доходы: {current_month_income:,.0f} ₽", size=16, color=ft.Colors.GREEN, weight=ft.FontWeight.BOLD),
+                            ft.Text(f"Расходы: {current_month_expenses:,.0f} ₽", size=16, color=ft.Colors.RED, weight=ft.FontWeight.BOLD),
+                            ft.Text(f"Баланс: {month_balance:,.0f} ₽", size=16, color=ft.Colors.BLUE if month_balance >= 0 else ft.Colors.RED, weight=ft.FontWeight.BOLD)
+                        ], spacing=10),
+                        padding=20
+                    ),
+                    expand=1
+                )
+            ], spacing=20),
             
+            # Цели и дни рождения - два столбца
+            ft.Row([
+                # Цели
+                ft.Card(
+                    content=ft.Container(
+                        content=ft.Column([
+                            ft.Text("🎯 Цели", size=20, weight=ft.FontWeight.BOLD),
+                            ft.Divider(),
+                            ft.Text(f"Активных целей: {len(goals)}", size=16, weight=ft.FontWeight.BOLD),
+                            ft.Text(f"Нужно накопить: {remaining_goals:,.0f} ₽" if goals else "Нет целей", size=14, color=ft.Colors.ORANGE),
+                            ft.Text(f"Уже накоплено: {total_invested:,.0f} ₽" if goals else "", size=14, color=ft.Colors.GREEN)
+                        ], spacing=10),
+                        padding=20
+                    ),
+                    expand=1
+                ),
+                
+                # Дни рождения
+                ft.Card(
+                    content=ft.Container(
+                        content=ft.Column([
+                            ft.Text("🎂 Дни рождения", size=20, weight=ft.FontWeight.BOLD),
+                            ft.Divider(),
+                            ft.Text(f"В этом месяце: {len(current_birthdays)}", size=16, weight=ft.FontWeight.BOLD),
+                            ft.Text(", ".join([bday["name"] for bday in current_birthdays]) if current_birthdays else "Нет дней рождения", size=14, color=ft.Colors.PINK)
+                        ], spacing=10),
+                        padding=20
+                    ),
+                    expand=1
+                )
+            ], spacing=20),
+            
+            # Календарь
             ft.Card(
                 content=ft.Container(
                     content=ft.Column([
-                        ft.Text("До следующей зарплаты", size=18, weight=ft.FontWeight.BOLD),
-                        ft.Text(f"{days_until_salary} дней", size=24, weight=ft.FontWeight.BOLD, color=ft.Colors.BLUE),
-                        ft.Text(f"Рекомендуемый дневной бюджет: {daily_budget:,.0f} ₽", size=16)
+                        ft.Text("📅 Календарь", size=20, weight=ft.FontWeight.BOLD),
+                        ft.Divider(),
+                        self.create_mini_calendar()
                     ], spacing=10),
                     padding=20
                 )
             ),
             
+            # До зарплаты
             ft.Card(
                 content=ft.Container(
                     content=ft.Column([
-                        ft.Text("🧠 Умный калькулятор покупок", size=18, weight=ft.FontWeight.BOLD),
-                        ft.Text("Введите товар и цену - получите полный анализ возможности покупки", size=12, color=ft.Colors.GREY_600),
-                        ft.TextField(
-                            label="Название товара",
-                            on_change=self.update_purchase_name
-                        ),
-                        ft.TextField(
-                            label="Цена (₽)",
-                            keyboard_type=ft.KeyboardType.NUMBER,
-                            on_change=self.update_purchase_price
-                        ),
-                        ft.ElevatedButton(
-                            "Могу ли я это купить?",
-                            on_click=self.check_purchase_affordability,
-                            style=ft.ButtonStyle(bgcolor=ft.Colors.GREEN_400)
-                        ),
-                        self.create_purchase_analysis_container()
-                    ], spacing=10),
-                    padding=20
+                        ft.Text("📅 До зарплаты", size=20, weight=ft.FontWeight.BOLD),
+                        ft.Divider(),
+                        ft.Text(f"Осталось дней: {days_until_salary}", size=18, weight=ft.FontWeight.BOLD),
+                        ft.Text(f"Дневной бюджет: {daily_budget:,.0f} ₽", size=16, color=ft.Colors.GREEN),
+                        ft.Text(f"Следующая зарплата: {self.get_next_salary_date_formatted()}", size=14, color=ft.Colors.GREY_600),
+                        ft.Divider(),
+                        ft.Text("📊 Детали:", size=14, weight=ft.FontWeight.BOLD),
+                        ft.Text(f"• Всего денег: {current_money:,.0f} ₽", size=12),
+                        ft.Text(f"• Резерв: {safety_reserve:,.0f} ₽", size=12),
+                        ft.Text(f"• Доступно: {free_money:,.0f} ₽", size=12),
+                        ft.Text(f"• На день: {daily_budget:,.0f} ₽", size=12)
+                    ]),
+                    padding=20,
+                    border_radius=10
                 )
             ),
             
-            
+            # Улучшенный умный калькулятор покупок
             ft.Card(
                 content=ft.Container(
                     content=ft.Column([
-                        ft.Text("Быстрые действия", size=18, weight=ft.FontWeight.BOLD),
+                        ft.Text("🧮 Умный калькулятор покупок", size=20, weight=ft.FontWeight.BOLD),
+                        ft.Divider(),
                         ft.Row([
-                            ft.ElevatedButton("Добавить доход", on_click=self.show_add_income_dialog),
-                            ft.ElevatedButton("Добавить расход", on_click=self.show_add_expense_dialog)
-                        ], spacing=10)
-                    ], spacing=10),
+                            ft.TextField(
+                                label="Название товара",
+                                value=self.purchase_name,
+                                on_change=self.update_purchase_name,
+                                expand=1,
+                                border_radius=8
+                            ),
+                            ft.TextField(
+                                label="Цена (₽)",
+                                value=str(self.purchase_price) if self.purchase_price > 0 else "",
+                                on_change=self.update_purchase_price,
+                                keyboard_type=ft.KeyboardType.NUMBER,
+                                expand=1,
+                                border_radius=8
+                            )
+                        ], spacing=10),
+                        ft.ElevatedButton(
+                            "🔍 Анализировать покупку",
+                            on_click=self.check_purchase_affordability,
+                            bgcolor=ft.Colors.BLUE,
+                            color=ft.Colors.WHITE,
+                            style=ft.ButtonStyle(
+                                shape=ft.RoundedRectangleBorder(radius=8)
+                            )
+                        ),
+                        self.purchase_analysis
+                    ], spacing=15),
                     padding=20
                 )
             ),
             
-            self.create_critical_alerts()
+            # Быстрые действия
+            ft.Card(
+                content=ft.Container(
+                    content=ft.Column([
+                        ft.Text("⚡ Быстрые действия", size=20, weight=ft.FontWeight.BOLD),
+                        ft.Divider(),
+                        ft.Row([
+                            ft.ElevatedButton(
+                                "➕ Добавить доход",
+                                on_click=self.go_to_money_page,
+                                bgcolor=ft.Colors.GREEN,
+                                color=ft.Colors.WHITE,
+                                expand=1,
+                                style=ft.ButtonStyle(
+                                    shape=ft.RoundedRectangleBorder(radius=8)
+                                )
+                            ),
+                            ft.ElevatedButton(
+                                "➖ Добавить расход",
+                                on_click=self.go_to_money_page,
+                                bgcolor=ft.Colors.RED,
+                                color=ft.Colors.WHITE,
+                                expand=1,
+                                style=ft.ButtonStyle(
+                                    shape=ft.RoundedRectangleBorder(radius=8)
+                                )
+                            ),
+                            ft.ElevatedButton(
+                                "📊 Аналитика",
+                                on_click=self.go_to_analytics_page,
+                                bgcolor=ft.Colors.BLUE,
+                                color=ft.Colors.WHITE,
+                                expand=1,
+                                style=ft.ButtonStyle(
+                                    shape=ft.RoundedRectangleBorder(radius=8)
+                                )
+                            )
+                        ], spacing=10)
+                    ], spacing=15),
+                    padding=20
+                )
+            ),
+            
+            # Предупреждения и рекомендации
+            self.create_smart_alerts(warnings, recommendations)
+            
         ], spacing=20, scroll=ft.ScrollMode.AUTO)
+    
+    def go_to_money_page(self, e):
+        """Переход на страницу денег"""
+        self.main_content.content = self.create_money_page()
+        self.page.update()
+    
+    def go_to_analytics_page(self, e):
+        """Переход на страницу аналитики"""
+        self.main_content.content = self.create_analytics_page()
+        self.page.update()
+    
+    def create_mini_calendar(self):
+        """Создает аккуратный мини-календарь текущего месяца"""
+        import calendar
+        now = datetime.now()
+        year = now.year
+        month = now.month
+        
+        # Получаем календарь месяца
+        cal = calendar.monthcalendar(year, month)
+        month_name = calendar.month_name[month]
+        
+        # Создаем заголовок
+        header = ft.Container(
+            content=ft.Column([
+                ft.Text("📅 Календарь", size=14, weight=ft.FontWeight.BOLD),
+                ft.Text(f"📅 {month_name} {year}", size=12, color=ft.Colors.BLUE)
+            ], horizontal_alignment=ft.CrossAxisAlignment.CENTER),
+            padding=8
+        )
+        
+        # Создаем дни недели с фиксированной шириной
+        weekdays = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"]
+        weekday_row = ft.Row([
+            ft.Container(
+                content=ft.Text(day, size=11, weight=ft.FontWeight.BOLD, color=ft.Colors.GREY_600),
+                width=28,
+                height=24,
+                alignment=ft.alignment.center
+            )
+            for day in weekdays
+        ], alignment=ft.MainAxisAlignment.SPACE_EVENLY)
+        
+        # Создаем дни месяца с фиксированными размерами
+        day_rows = []
+        for week in cal:
+            week_row = ft.Row([], alignment=ft.MainAxisAlignment.SPACE_EVENLY)
+            for day in week:
+                if day == 0:
+                    # Пустая ячейка для дней предыдущего/следующего месяца
+                    week_row.controls.append(
+                        ft.Container(
+                            content=ft.Text("", size=11),
+                            width=28,
+                            height=28,
+                            alignment=ft.alignment.center
+                        )
+                    )
+                else:
+                    is_today = day == now.day
+                    is_weekend = week.index(day) >= 5
+                    
+                    # Определяем цвета
+                    if is_today:
+                        color = ft.Colors.WHITE
+                        bgcolor = ft.Colors.BLUE_400
+                        border_color = ft.Colors.BLUE_600
+                    elif is_weekend:
+                        color = ft.Colors.RED_600
+                        bgcolor = ft.Colors.RED_50
+                        border_color = ft.Colors.RED_200
+                    else:
+                        color = ft.Colors.BLACK
+                        bgcolor = ft.Colors.WHITE
+                        border_color = ft.Colors.GREY_200
+                    
+                    week_row.controls.append(
+                        ft.Container(
+                            content=ft.Text(str(day), size=11, color=color, weight=ft.FontWeight.BOLD if is_today else ft.FontWeight.NORMAL),
+                            width=28,
+                            height=28,
+                            bgcolor=bgcolor,
+                            border=ft.border.all(1, border_color),
+                            border_radius=4,
+                            alignment=ft.alignment.center
+                        )
+                    )
+            day_rows.append(week_row)
+        
+        # Создаем основной контейнер календаря
+        calendar_container = ft.Container(
+            content=ft.Column([
+                weekday_row,
+                *day_rows
+            ], spacing=2),
+            padding=8,
+            bgcolor=ft.Colors.GREY_50,
+            border_radius=8,
+            border=ft.border.all(1, ft.Colors.GREY_300)
+        )
+        
+        return ft.Column([
+            header,
+            calendar_container
+        ], spacing=5, horizontal_alignment=ft.CrossAxisAlignment.CENTER)
+    
+    def create_smart_alerts(self, warnings, recommendations):
+        """Создает умные предупреждения и рекомендации"""
+        alerts = []
+        
+        for warning in warnings:
+            alerts.append(ft.Container(
+                content=ft.Row([
+                    ft.Icon(ft.Icons.WARNING, color=ft.Colors.ORANGE, size=16),
+                    ft.Text(warning, size=12, color=ft.Colors.ORANGE)
+                ]),
+                padding=8,
+                bgcolor=ft.Colors.ORANGE_50,
+            ))
+        
+        for recommendation in recommendations:
+            alerts.append(ft.Container(
+                content=ft.Row([
+                    ft.Icon(ft.Icons.THUMB_UP, color=ft.Colors.GREEN, size=16),
+                    ft.Text(recommendation, size=12, color=ft.Colors.GREEN)
+                ]),
+                padding=8,
+                bgcolor=ft.Colors.GREEN_50,
+            ))
+        
+        return ft.Column(alerts, spacing=5) if alerts else ft.Container()
+    
+    def get_current_month_birthdays(self):
+        """Получает дни рождения текущего месяца"""
+        now = datetime.now()
+        current_month = now.month
+        
+        birthdays = []
+        for birthday in self.finance_app.data["birthdays"]:
+            if self.convert_month_to_int(birthday["month"]) == current_month:
+                birthdays.append(birthday["name"])
+        
+        return birthdays
+    
+    def convert_month_to_int(self, month_name):
+        """Конвертирует название месяца в число"""
+        months = {
+            "Январь": 1, "Февраль": 2, "Март": 3, "Апрель": 4,
+            "Май": 5, "Июнь": 6, "Июль": 7, "Август": 8,
+            "Сентябрь": 9, "Октябрь": 10, "Ноябрь": 11, "Декабрь": 12
+        }
+        return months.get(month_name, 1)
+    
+    def calculate_days_until_salary(self, salary_date):
+        """Рассчитывает дни до следующей зарплаты"""
+        now = datetime.now()
+        current_month = now.month
+        current_year = now.year
+        
+        # Следующая зарплата
+        if now.day <= salary_date:
+            next_salary = datetime(current_year, current_month, salary_date)
+        else:
+            if current_month == 12:
+                next_salary = datetime(current_year + 1, 1, salary_date)
+            else:
+                next_salary = datetime(current_year, current_month + 1, salary_date)
+        
+        # Используем только даты без времени для точного расчета
+        today = now.date()
+        salary_day = next_salary.date()
+        delta = salary_day - today
+        return max(0, delta.days)
+    
+    def get_next_salary_date_formatted(self):
+        """Получает дату следующей зарплаты в формате строки"""
+        salary_date = self.finance_app.data["salary_dates"][0]
+        now = datetime.now()
+        current_month = now.month
+        current_year = now.year
+        
+        if now.day <= salary_date:
+            next_salary = datetime(current_year, current_month, salary_date)
+        else:
+            if current_month == 12:
+                next_salary = datetime(current_year + 1, 1, salary_date)
+            else:
+                next_salary = datetime(current_year, current_month + 1, salary_date)
+        
+        return next_salary.strftime("%d.%m.%Y")
+    
+    def calculate_current_month_expenses(self):
+        """Рассчитывает расходы текущего месяца"""
+        # Простой расчет - можно улучшить
+        return 30000
+    
+    def analyze_purchase_new(self, e):
+        """Новый анализ покупки"""
+        if not hasattr(self, 'purchase_price') or self.purchase_price <= 0:
+            self.purchase_result = ft.Text("Введите цену товара", size=14, color=ft.Colors.GREY_600)
+        else:
+            self.purchase_result = self.create_simple_purchase_analysis()
+        
+        self.page.update()
+    
+    def create_new_purchase_result(self):
+        """Создает контейнер для результата анализа"""
+        if not hasattr(self, 'purchase_result'):
+            self.purchase_result = ft.Text("Введите название товара и цену", size=14, color=ft.Colors.GREY_600)
+        
+        return ft.Container(
+            content=self.purchase_result,
+            padding=10
+        )
+    
+    def create_simple_purchase_analysis(self):
+        """Создает максимально подробный анализ покупки с детальной информацией"""
+        current_money = self.finance_app.data["current_money"]
+        safety_reserve = self.finance_app.data["safety_reserve"]
+        free_money = current_money - safety_reserve
+        price = getattr(self, 'purchase_price', 0)
+        product_name = getattr(self, 'purchase_name', 'Товар')
+        
+        # Получаем дополнительную информацию
+        goals = self.finance_app.data["goals"]
+        goal_investments = self.finance_app.data["goal_investments"]
+        total_goals = sum(goal["amount"] for goal in goals)
+        total_invested = sum(goal_investments.values())
+        remaining_goals = total_goals - total_invested
+        
+        # Рассчитываем месячные накопления
+        rent_cost = self.finance_app.data.get("rent_cost", 25000)
+        monthly_savings = self.finance_app.data["salary"] - self.calculate_average_monthly_expenses() - (3000 if self.finance_app.data["chatgpt_enabled"] else 0) - rent_cost
+        
+        # Анализ возможности покупки
+        can_buy_now = free_money >= price
+        after_purchase_free = free_money - price
+        reserve_impact = max(0, safety_reserve - after_purchase_free)
+        
+        analysis = []
+        
+        # Заголовок
+        analysis.append(ft.Text(f"🛒 {product_name} - {price:,.0f} ₽", size=18, weight=ft.FontWeight.BOLD))
+        analysis.append(ft.Divider())
+        
+        # Финансовая ситуация
+        analysis.append(ft.Container(
+            content=ft.Column([
+                ft.Text("💰 Ваша финансовая ситуация:", size=16, weight=ft.FontWeight.BOLD),
+                ft.Text(f"• Всего денег: {current_money:,.0f} ₽", size=14),
+                ft.Text(f"• Резерв безопасности: {safety_reserve:,.0f} ₽", size=14),
+                ft.Text(f"• Свободно для трат: {free_money:,.0f} ₽", size=14),
+                ft.Text(f"• После покупки останется: {after_purchase_free:,.0f} ₽", size=14)
+            ], spacing=5),
+            padding=15,
+            bgcolor=ft.Colors.BLUE_50,
+            border_radius=8
+        ))
+        
+        # Анализ покупки
+        if can_buy_now:
+            if after_purchase_free >= safety_reserve:
+                # Резерв не затронут
+                analysis.append(ft.Container(
+                    content=ft.Column([
+                        ft.Text("✅ МОЖНО КУПИТЬ", size=18, weight=ft.FontWeight.BOLD, color=ft.Colors.GREEN),
+                        ft.Text("Резерв не затронут", size=16, color=ft.Colors.GREEN),
+                        ft.Text(f"Останется резерва: {after_purchase_free:,.0f} ₽", size=14, color=ft.Colors.GREEN)
+                    ], horizontal_alignment=ft.CrossAxisAlignment.CENTER),
+                    padding=15,
+                    bgcolor=ft.Colors.GREEN_50,
+                    border_radius=8
+                ))
+            elif after_purchase_free > 0:
+                # Затронет резерв, но не критично
+                analysis.append(ft.Container(
+                    content=ft.Column([
+                        ft.Text("⚠️ МОЖЕТЕ КУПИТЬ, НО ЗАТРОНЕТЕ РЕЗЕРВ", size=18, weight=ft.FontWeight.BOLD, color=ft.Colors.ORANGE),
+                        ft.Text(f"Затронете резерв на: {reserve_impact:,.0f} ₽", size=16),
+                        ft.Text(f"Останется резерва: {after_purchase_free:,.0f} ₽", size=16),
+                        ft.Text("⚠️ Не рекомендуется - нарушает финансовую безопасность", size=14, color=ft.Colors.RED)
+                    ], horizontal_alignment=ft.CrossAxisAlignment.CENTER),
+                    padding=15,
+                    bgcolor=ft.Colors.ORANGE_50,
+                    border_radius=8
+                ))
+            else:
+                # Критическая ситуация
+                analysis.append(ft.Container(
+                    content=ft.Column([
+                        ft.Text("❌ НЕЛЬЗЯ КУПИТЬ", size=18, weight=ft.FontWeight.BOLD, color=ft.Colors.RED),
+                        ft.Text(f"Недостаточно свободных денег", size=16, color=ft.Colors.RED),
+                        ft.Text(f"Нужно еще: {abs(after_purchase_free):,.0f} ₽", size=16, color=ft.Colors.RED)
+                    ], horizontal_alignment=ft.CrossAxisAlignment.CENTER),
+                    padding=15,
+                    bgcolor=ft.Colors.RED_50,
+                ))
+        else:
+            # Не может купить
+            needed = price - free_money
+            analysis.append(ft.Container(
+                content=ft.Column([
+                    ft.Text("❌ НЕЛЬЗЯ КУПИТЬ", size=16, weight=ft.FontWeight.BOLD, color=ft.Colors.RED),
+                    ft.Text(f"Недостаточно свободных денег", size=14, color=ft.Colors.RED),
+                    ft.Text(f"Нужно еще: {needed:,.0f} ₽", size=14, color=ft.Colors.RED)
+                ], horizontal_alignment=ft.CrossAxisAlignment.CENTER),
+                padding=15,
+                bgcolor=ft.Colors.RED_50,
+            ))
+        
+        # Детали
+        analysis.append(ft.Text("📊 Детали:", size=14, weight=ft.FontWeight.BOLD))
+        analysis.append(ft.Text(f"• Всего денег: {current_money:,.0f} ₽", size=12))
+        analysis.append(ft.Text(f"• Резерв безопасности: {safety_reserve:,.0f} ₽", size=12))
+        analysis.append(ft.Text(f"• Свободно для трат: {free_money:,.0f} ₽", size=12))
+        analysis.append(ft.Text(f"• После покупки: {after_purchase_free:,.0f} ₽", size=12, 
+                               color=ft.Colors.GREEN if after_purchase_free >= 0 else ft.Colors.RED))
+        
+        # Анализ по месяцам
+        analysis.append(ft.Text("📅 Анализ по месяцам:", size=14, weight=ft.FontWeight.BOLD))
+        
+        # Получаем лучшие месяцы для покупки
+        best_months = self.get_best_months_for_purchase(price)
+        worst_months = self.get_worst_months_for_purchase(price)
+        
+        # Лучшие месяцы
+        if best_months:
+            analysis.append(ft.Text("🟢 Лучшие месяцы для покупки:", size=12, weight=ft.FontWeight.BOLD, color=ft.Colors.GREEN))
+            for month_info in best_months[:3]:  # Показываем топ-3
+                month_name = month_info['month']
+                reason = month_info['reason']
+                analysis.append(ft.Text(f"  • {month_name}: {reason}", size=11, color=ft.Colors.GREEN))
+        
+        # Худшие месяцы
+        if worst_months:
+            analysis.append(ft.Text("🔴 Избегайте покупки в:", size=12, weight=ft.FontWeight.BOLD, color=ft.Colors.RED))
+            for month_info in worst_months[:2]:  # Показываем топ-2 худших
+                month_name = month_info['month']
+                reason = month_info['reason']
+                analysis.append(ft.Text(f"  • {month_name}: {reason}", size=11, color=ft.Colors.RED))
+        
+        # План накоплений
+        if not can_buy_now:
+            analysis.append(ft.Text("💰 План накоплений:", size=14, weight=ft.FontWeight.BOLD))
+            needed = price - free_money
+            monthly_savings = self.calculate_monthly_savings()
+            
+            if monthly_savings > 0:
+                months_to_save = max(1, round(needed / monthly_savings))
+                analysis.append(ft.Text(f"• Нужно накопить: {needed:,.0f} ₽", size=12))
+                analysis.append(ft.Text(f"• При накоплении {monthly_savings:,.0f} ₽/мес: {months_to_save} мес", size=12))
+                
+                # Лучшие месяцы для накоплений
+                best_saving_months = self.get_best_months_for_saving()
+                if best_saving_months:
+                    analysis.append(ft.Text("• Лучше начать копить в:", size=12, weight=ft.FontWeight.BOLD))
+                    for month_info in best_saving_months[:2]:
+                        month_name = month_info['month']
+                        reason = month_info['reason']
+                        analysis.append(ft.Text(f"  - {month_name}: {reason}", size=11, color=ft.Colors.BLUE))
+            else:
+                analysis.append(ft.Text("• Увеличьте доходы или уменьшите расходы", size=12, color=ft.Colors.ORANGE))
+        
+        # Умные советы
+        analysis.append(ft.Text("💡 Умные советы:", size=14, weight=ft.FontWeight.BOLD))
+        
+        if can_buy_now and after_purchase_free >= safety_reserve:
+            analysis.append(ft.Text("• Покупка безопасна - можете покупать сейчас", size=12, color=ft.Colors.GREEN))
+            analysis.append(ft.Text("• Рассмотрите скидки в конце месяца", size=12, color=ft.Colors.BLUE))
+        elif can_buy_now and after_purchase_free > 0:
+            analysis.append(ft.Text("• Лучше подождать - затронете резерв", size=12, color=ft.Colors.ORANGE))
+            analysis.append(ft.Text("• Накопите еще {:.0f} ₽ перед покупкой".format(safety_reserve - after_purchase_free), size=12, color=ft.Colors.ORANGE))
+        else:
+            analysis.append(ft.Text("• Накопите деньги перед покупкой", size=12, color=ft.Colors.RED))
+            analysis.append(ft.Text("• Поищите скидки и акции", size=12, color=ft.Colors.BLUE))
+            analysis.append(ft.Text("• Рассмотрите покупку в рассрочку", size=12, color=ft.Colors.BLUE))
+            analysis.append(ft.Text("• Подождите лучшего месяца для покупки", size=12, color=ft.Colors.BLUE))
+        
+        # Влияние на цели
+        if goals and remaining_goals > 0:
+            analysis.append(ft.Text("🎯 Влияние на ваши цели:", size=14, weight=ft.FontWeight.BOLD))
+            analysis.append(ft.Text(f"• Осталось накопить: {remaining_goals:,.0f} ₽", size=12))
+            
+            if can_buy_now:
+                new_remaining = remaining_goals + price
+                analysis.append(ft.Text(f"• После покупки нужно будет накопить: {new_remaining:,.0f} ₽", size=12, color=ft.Colors.ORANGE))
+                
+                if monthly_savings > 0:
+                    months_delay = price / monthly_savings
+                    analysis.append(ft.Text(f"• Цели отложатся на: {months_delay:.1f} месяцев", size=12, color=ft.Colors.ORANGE))
+            else:
+                analysis.append(ft.Text("• Покупка не повлияет на цели (недостаточно денег)", size=12, color=ft.Colors.GREY_600))
+        
+        # Риск-анализ
+        analysis.append(ft.Text("⚠️ Риск-анализ:", size=14, weight=ft.FontWeight.BOLD))
+        
+        if after_purchase_free >= safety_reserve * 1.5:
+            risk_level = "Низкий"
+            risk_color = ft.Colors.GREEN
+        elif after_purchase_free >= safety_reserve:
+            risk_level = "Средний"
+            risk_color = ft.Colors.ORANGE
+        else:
+            risk_level = "Высокий"
+            risk_color = ft.Colors.RED
+        
+        analysis.append(ft.Text(f"• Уровень риска: {risk_level}", size=12, color=risk_color))
+        analysis.append(ft.Text(f"• Останется резерва: {after_purchase_free:,.0f} ₽", size=12))
+        analysis.append(ft.Text(f"• Рекомендуемый резерв: {safety_reserve:,.0f} ₽", size=12))
+        
+        # Альтернативы
+        analysis.append(ft.Text("🔄 Альтернативы:", size=14, weight=ft.FontWeight.BOLD))
+        
+        if not can_buy_now:
+            analysis.append(ft.Text("• Накопите деньги перед покупкой", size=12, color=ft.Colors.BLUE))
+            analysis.append(ft.Text("• Рассмотрите покупку в рассрочку", size=12, color=ft.Colors.BLUE))
+            analysis.append(ft.Text("• Поищите более дешевые аналоги", size=12, color=ft.Colors.BLUE))
+        else:
+            analysis.append(ft.Text("• Можете купить сейчас", size=12, color=ft.Colors.GREEN))
+            analysis.append(ft.Text("• Подождите скидок", size=12, color=ft.Colors.BLUE))
+            analysis.append(ft.Text("• Сравните с другими магазинами", size=12, color=ft.Colors.BLUE))
+        
+        # Дополнительные советы
+        analysis.append(ft.Text("🎯 Дополнительные советы:", size=12, weight=ft.FontWeight.BOLD))
+        analysis.append(ft.Text("• Следите за сезонными скидками", size=11, color=ft.Colors.GREY_600))
+        analysis.append(ft.Text("• Сравните цены в разных магазинах", size=11, color=ft.Colors.GREY_600))
+        analysis.append(ft.Text("• Рассмотрите б/у варианты", size=11, color=ft.Colors.GREY_600))
+        analysis.append(ft.Text("• Используйте кэшбэк и бонусы", size=11, color=ft.Colors.GREY_600))
+        analysis.append(ft.Text("• Проверьте гарантию и возврат", size=11, color=ft.Colors.GREY_600))
+        analysis.append(ft.Text("• Учитывайте стоимость доставки", size=11, color=ft.Colors.GREY_600))
+        
+        return ft.Column(analysis, spacing=10)
+    
+    def get_best_months_for_purchase(self, price=None):
+        """Возвращает лучшие месяцы для покупки с причинами"""
+        months_analysis = {
+            1: {"name": "Январь", "good": True, "reason": "Нет праздников, стабильные расходы"},
+            2: {"name": "Февраль", "good": True, "reason": "День Святого Валентина, но небольшие траты"},
+            3: {"name": "Март", "good": True, "reason": "8 Марта, но умеренные расходы"},
+            4: {"name": "Апрель", "good": True, "reason": "Нет крупных праздников"},
+            5: {"name": "Май", "good": True, "reason": "Майские праздники, но много выходных"},
+            6: {"name": "Июнь", "good": True, "reason": "Начало лета, стабильные расходы"},
+            7: {"name": "Июль", "good": True, "reason": "Середина лета, отпуска"},
+            8: {"name": "Август", "good": True, "reason": "Конец лета, подготовка к осени"},
+            9: {"name": "Сентябрь", "good": True, "reason": "Начало учебного года, стабильность"},
+            10: {"name": "Октябрь", "good": True, "reason": "Осень, умеренные расходы"},
+            11: {"name": "Ноябрь", "good": True, "reason": "Подготовка к зиме, стабильность"},
+            12: {"name": "Декабрь", "good": False, "reason": "Новый год - много трат"}
+        }
+        
+        # Добавляем дни рождения
+        birthdays = self.finance_app.data["birthdays"]
+        for birthday in birthdays:
+            month = self.convert_month_to_int(birthday["month"])
+            if month in months_analysis:
+                months_analysis[month]["good"] = False
+                months_analysis[month]["reason"] = f"День рождения {birthday['name']} - дополнительные траты"
+        
+        # Фильтруем и сортируем по приоритету
+        good_months = []
+        for month_num, data in months_analysis.items():
+            if data["good"]:
+                good_months.append({
+                    "month": data["name"],
+                    "reason": data["reason"],
+                    "priority": self.get_month_priority(month_num)
+                })
+        
+        # Сортируем по приоритету (чем выше, тем лучше)
+        good_months.sort(key=lambda x: x["priority"], reverse=True)
+        return good_months
+    
+    def get_worst_months_for_purchase(self, price=None):
+        """Возвращает худшие месяцы для покупки с причинами"""
+        months_analysis = {
+            1: {"name": "Январь", "bad": False, "reason": ""},
+            2: {"name": "Февраль", "bad": False, "reason": ""},
+            3: {"name": "Март", "bad": False, "reason": ""},
+            4: {"name": "Апрель", "bad": False, "reason": ""},
+            5: {"name": "Май", "bad": False, "reason": ""},
+            6: {"name": "Июнь", "bad": False, "reason": ""},
+            7: {"name": "Июль", "bad": False, "reason": ""},
+            8: {"name": "Август", "bad": False, "reason": ""},
+            9: {"name": "Сентябрь", "bad": False, "reason": ""},
+            10: {"name": "Октябрь", "bad": False, "reason": ""},
+            11: {"name": "Ноябрь", "bad": False, "reason": ""},
+            12: {"name": "Декабрь", "bad": True, "reason": "Новый год - много трат на подарки"}
+        }
+        
+        # Добавляем дни рождения
+        birthdays = self.finance_app.data["birthdays"]
+        for birthday in birthdays:
+            month = self.convert_month_to_int(birthday["month"])
+            if month in months_analysis:
+                months_analysis[month]["bad"] = True
+                months_analysis[month]["reason"] = f"День рождения {birthday['name']} - дополнительные траты"
+        
+        # Фильтруем плохие месяцы
+        bad_months = []
+        for month_num, data in months_analysis.items():
+            if data["bad"]:
+                bad_months.append({
+                    "month": data["name"],
+                    "reason": data["reason"],
+                    "priority": self.get_month_bad_priority(month_num)
+                })
+        
+        # Сортируем по приоритету (чем выше, тем хуже)
+        bad_months.sort(key=lambda x: x["priority"], reverse=True)
+        return bad_months
+    
+    def get_best_months_for_saving(self):
+        """Возвращает лучшие месяцы для накопления с причинами"""
+        best_purchase = self.get_best_months_for_purchase()
+        # Для накоплений приоритет немного другой
+        saving_months = []
+        for month_info in best_purchase:
+            month_name = month_info["month"]
+            if month_name in ["Апрель", "Октябрь", "Сентябрь"]:
+                reason = f"Отличное время для накоплений - {month_info['reason']}"
+            else:
+                reason = f"Хорошее время для накоплений - {month_info['reason']}"
+            
+            saving_months.append({
+                "month": month_name,
+                "reason": reason
+            })
+        
+        return saving_months
+    
+    def get_month_priority(self, month):
+        """Возвращает приоритет месяца для покупок (1-10)"""
+        priorities = {
+            1: 8,   # Январь - после праздников, хорошие скидки
+            2: 6,   # Февраль - стабильно
+            3: 7,   # Март - весна, активность
+            4: 9,   # Апрель - отличный месяц
+            5: 8,   # Май - праздники, но много выходных
+            6: 7,   # Июнь - лето
+            7: 6,   # Июль - отпуска
+            8: 7,   # Август - конец лета
+            9: 8,   # Сентябрь - начало года
+            10: 9,  # Октябрь - отличный месяц
+            11: 8,  # Ноябрь - стабильно
+            12: 2   # Декабрь - много трат
+        }
+        return priorities.get(month, 5)
+    
+    def get_month_bad_priority(self, month):
+        """Возвращает приоритет месяца для избегания покупок (1-10)"""
+        priorities = {
+            1: 3,   # Январь - после праздников, но может быть усталость
+            2: 2,   # Февраль - стабильно
+            3: 2,   # Март - стабильно
+            4: 1,   # Апрель - хороший месяц
+            5: 2,   # Май - праздники, но не критично
+            6: 1,   # Июнь - хороший месяц
+            7: 2,   # Июль - отпуска, но не критично
+            8: 1,   # Август - хороший месяц
+            9: 1,   # Сентябрь - хороший месяц
+            10: 1,  # Октябрь - отличный месяц
+            11: 1,  # Ноябрь - хороший месяц
+            12: 10  # Декабрь - худший месяц
+        }
+        return priorities.get(month, 1)
+    
+    def calculate_monthly_savings(self):
+        """Рассчитывает ежемесячные накопления"""
+        salary = self.finance_app.data["salary"]
+        monthly_expenses = self.calculate_current_month_expenses()
+        chatgpt_cost = 3000 if self.finance_app.data["chatgpt_enabled"] else 0
+        rent_cost = self.finance_app.data.get("rent", 25000)
+        return salary - monthly_expenses - chatgpt_cost - rent_cost
+    
+    def update_purchase_name(self, e):
+        """Обновляет название товара"""
+        self.purchase_name = e.control.value
+    
+    def update_purchase_price(self, e):
+        """Обновляет цену товара"""
+        try:
+            self.purchase_price = float(e.control.value) if e.control.value else 0
+        except ValueError:
+            self.purchase_price = 0
+    
+    def go_to_analytics_page(self, e):
+        """Переход на страницу аналитики"""
+        self.main_content.content = self.create_analytics_page()
+        self.page.update()
     
     def create_money_page(self):
         return ft.Column([
@@ -409,6 +1173,16 @@ class MainApp:
             ft.Card(
                 content=ft.Container(
                     content=ft.Column([
+                        ft.Text("📊 Детальный анализ по месяцам", size=18, weight=ft.FontWeight.BOLD),
+                        self.create_detailed_monthly_analysis()
+                    ], spacing=10),
+                    padding=20
+                )
+            ),
+            
+            ft.Card(
+                content=ft.Container(
+                    content=ft.Column([
                         ft.Text("💡 Конкретные действия", size=18, weight=ft.FontWeight.BOLD),
                         self.create_action_plan()
                     ], spacing=10),
@@ -481,14 +1255,14 @@ class MainApp:
         
         # Получаем информацию о квартплате
         rent_paid_until = self.finance_app.data.get("rent_paid_until", "")
-        current_date = datetime.datetime(2025, datetime.datetime.now().month, datetime.datetime.now().day)
+        current_date = datetime(2025, datetime.now().month, datetime.now().day)
         
         # Определяем, нужно ли платить квартплату в текущем месяце
         def should_pay_rent_current():
             if not rent_paid_until:
                 return True
             try:
-                paid_until = datetime.datetime.strptime(rent_paid_until, "%Y-%m-%d")
+                paid_until = datetime.strptime(rent_paid_until, "%Y-%m-%d")
                 return current_date > paid_until
             except:
                 return True
@@ -498,9 +1272,9 @@ class MainApp:
         monthly_savings = self.finance_app.data["salary"] - self.calculate_average_monthly_expenses() - (3000 if self.finance_app.data["chatgpt_enabled"] else 0) - rent_for_current_month
         
         # Получаем текущий месяц и анализируем праздники
-        current_month = datetime.datetime.now().month
-        current_year = datetime.datetime.now().year
-        current_day = datetime.datetime.now().day
+        current_month = datetime.now().month
+        current_year = datetime.now().year
+        current_day = datetime.now().day
         
         # Анализируем праздники и ДР в текущем месяце
         holidays = self.get_holidays_for_month(current_month)
@@ -620,8 +1394,57 @@ class MainApp:
         birthdays = []
         for birthday in self.finance_app.data["birthdays"]:
             if self.convert_month_to_int(birthday["month"]) == month:
-                birthdays.append(f"{birthday['name']} ({birthday['relationship']})")
+                birthdays.append({
+                    "name": birthday["name"],
+                    "relationship": birthday["relationship"],
+                    "gift_cost": birthday.get("gift_cost", 2000)
+                })
         return birthdays
+    
+    def get_months_analysis(self):
+        """Анализ месяцев с учетом праздников и дней рождения"""
+        months_analysis = {
+            1: {"name": "Январь", "good": True, "cost": 0, "reason": ""},
+            2: {"name": "Февраль", "good": True, "cost": 0, "reason": ""},
+            3: {"name": "Март", "good": True, "cost": 0, "reason": ""},
+            4: {"name": "Апрель", "good": True, "cost": 0, "reason": ""},
+            5: {"name": "Май", "good": True, "cost": 0, "reason": ""},
+            6: {"name": "Июнь", "good": True, "cost": 0, "reason": ""},
+            7: {"name": "Июль", "good": True, "cost": 0, "reason": ""},
+            8: {"name": "Август", "good": True, "cost": 0, "reason": ""},
+            9: {"name": "Сентябрь", "good": True, "cost": 0, "reason": ""},
+            10: {"name": "Октябрь", "good": True, "cost": 0, "reason": ""},
+            11: {"name": "Ноябрь", "good": True, "cost": 0, "reason": ""},
+            12: {"name": "Декабрь", "good": True, "cost": 0, "reason": ""}
+        }
+        
+        # Добавляем праздники
+        holiday_months = {
+            2: 3000,  # День святого Валентина
+            3: 5000,  # 8 Марта
+            5: 2000,  # День Победы
+            6: 2000,  # День России
+            11: 2000, # День народного единства
+            12: 15000 # Новый год
+        }
+        
+        for month, cost in holiday_months.items():
+            months_analysis[month]["cost"] = cost
+            months_analysis[month]["good"] = False
+            months_analysis[month]["reason"] = "Праздник"
+        
+        # Добавляем дни рождения
+        for birthday in self.finance_app.data["birthdays"]:
+            month = self.convert_month_to_int(birthday["month"])
+            if month in months_analysis:
+                months_analysis[month]["cost"] += birthday.get("gift_cost", 2000)
+                months_analysis[month]["good"] = months_analysis[month]["cost"] < 5000
+                if months_analysis[month]["reason"]:
+                    months_analysis[month]["reason"] += f" + ДР {birthday['name']}"
+                else:
+                    months_analysis[month]["reason"] = f"ДР {birthday['name']}"
+        
+        return months_analysis
     
     def get_month_name(self, month):
         months = ["", "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
@@ -667,7 +1490,7 @@ class MainApp:
     def add_purchase_recommendations(self, analysis, need_to_save, monthly_savings, current_month):
         # Анализируем лучшие месяцы для покупки
         months_analysis = {
-            1: {"name": "Январь", "holiday": "Новый год", "cost": 15000, "good": False, "reason": "Дорогой месяц - много трат на праздники"},
+            1: {"name": "Январь", "holiday": "", "cost": 0, "good": True, "reason": "Спокойный месяц"},
             2: {"name": "Февраль", "holiday": "День Святого Валентина", "cost": 5000, "good": True, "reason": "Хороший месяц - мало трат"},
             3: {"name": "Март", "holiday": "8 Марта", "cost": 3000, "good": True, "reason": "Хороший месяц - мало трат"},
             4: {"name": "Апрель", "holiday": "Нет", "cost": 0, "good": True, "reason": "Отличный месяц - нет праздников"},
@@ -744,7 +1567,7 @@ class MainApp:
     def find_best_month_for_purchase(self):
         # Анализируем месяцы для покупки
         months_analysis = {
-            1: {"name": "Январь", "holiday": "Новый год", "cost": 15000, "good": False},
+            1: {"name": "Январь", "holiday": "", "cost": 0, "good": True},
             2: {"name": "Февраль", "holiday": "День Святого Валентина", "cost": 5000, "good": True},
             3: {"name": "Март", "holiday": "8 Марта", "cost": 3000, "good": True},
             4: {"name": "Апрель", "holiday": "Нет", "cost": 0, "good": True},
@@ -860,14 +1683,14 @@ class MainApp:
         
         # Получаем информацию о квартплате
         rent_paid_until = self.finance_app.data.get("rent_paid_until", "")
-        current_date = datetime.datetime(2025, datetime.datetime.now().month, datetime.datetime.now().day)
+        current_date = datetime(2025, datetime.now().month, datetime.now().day)
         
         # Определяем, нужно ли платить квартплату в текущем месяце
         def should_pay_rent_current():
             if not rent_paid_until:
                 return True
             try:
-                paid_until = datetime.datetime.strptime(rent_paid_until, "%Y-%m-%d")
+                paid_until = datetime.strptime(rent_paid_until, "%Y-%m-%d")
                 return current_date > paid_until
             except:
                 return True
@@ -877,8 +1700,8 @@ class MainApp:
         
         # Расчеты с учетом квартплаты и реальной даты
         # Если сегодня конец месяца (последние 2 дня), то накопления не актуальны
-        current_day = datetime.datetime.now().day
-        current_month = datetime.datetime.now().month
+        current_day = datetime.now().day
+        current_month = datetime.now().month
         current_year = 2025
         current_year = 2025  # Устанавливаем 2025 год
         days_in_month = 30  # Сентябрь
@@ -891,7 +1714,7 @@ class MainApp:
         
         # Анализируем месяцы с учетом праздников и ДР
         months_analysis = {
-            1: {"name": "Январь", "holiday": "Новый год", "cost": 15000, "good": False},
+            1: {"name": "Январь", "holiday": "", "cost": 0, "good": True},
             2: {"name": "Февраль", "holiday": "День Святого Валентина", "cost": 5000, "good": True},
             3: {"name": "Март", "holiday": "8 Марта", "cost": 3000, "good": True},
             4: {"name": "Апрель", "holiday": "Нет", "cost": 0, "good": True},
@@ -918,8 +1741,8 @@ class MainApp:
         
         # Анализ целей и лучших дней для накоплений
         salary_dates = self.finance_app.data["salary_dates"]
-        current_day = datetime.datetime.now().day
-        current_month = datetime.datetime.now().month
+        current_day = datetime.now().day
+        current_month = datetime.now().month
         current_year = 2025
         
         def analyze_goals():
@@ -970,64 +1793,6 @@ class MainApp:
             
             return ft.Column(goal_analysis, spacing=5)
         
-        def get_detailed_monthly_analysis():
-            """Детальный анализ по месяцам"""
-            analysis = []
-            current_month_name = ['', 'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 
-                                 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'][current_month]
-            
-            analysis.append(ft.Text("📊 Детальный анализ по месяцам:", size=16, weight=ft.FontWeight.BOLD))
-            
-            for month_num, data in months_analysis.items():
-                month_name = data["name"]
-                holiday_cost = data["cost"]
-                is_good = data["good"]
-                
-                # Рассчитываем рекомендуемую сумму для накоплений в этом месяце
-                if is_good:
-                    recommended_savings = monthly_savings
-                    status_color = ft.Colors.GREEN
-                    status_icon = "✅"
-                else:
-                    recommended_savings = max(0, monthly_savings - holiday_cost)
-                    status_color = ft.Colors.RED
-                    status_icon = "❌"
-                
-                # Определяем лучшие дни для этого месяца на основе прогноза и аналитики
-                if month_num == current_month:
-                    # Текущий месяц - учитываем реальную дату
-                    if current_day <= salary_dates[0]:
-                        best_days = f"{salary_dates[0]} число (после первой ЗП)"
-                    elif current_day <= salary_dates[1]:
-                        best_days = f"{salary_dates[1]} число (после второй ЗП)"
-                    else:
-                        best_days = "1 число следующего месяца"
-                else:
-                    # Будущие месяцы - анализируем по прогнозу
-                    if is_good:
-                        # Хороший месяц - можно копить с любой зарплаты
-                        best_days = f"{salary_dates[0]} или {salary_dates[1]} число"
-                    else:
-                        # Плохой месяц - лучше копить с первой зарплаты
-                        best_days = f"{salary_dates[0]} число (до праздников)"
-                
-                analysis.append(
-                    ft.Container(
-                        content=ft.Column([
-                            ft.Row([
-                                ft.Text(f"{status_icon} {month_name}", size=14, weight=ft.FontWeight.BOLD, color=status_color),
-                                ft.Text(f"Рекомендуется: {recommended_savings:,.0f} ₽", size=12, color=ft.Colors.BLUE)
-                            ]),
-                            ft.Text(f"Праздники/ДР: {holiday_cost:,.0f} ₽", size=11, color=ft.Colors.PURPLE) if holiday_cost > 0 else ft.Text("Без праздников", size=11, color=ft.Colors.GREY),
-                            ft.Text(f"Лучшие дни: {best_days}", size=11, color=ft.Colors.GREEN)
-                        ], spacing=2),
-                        padding=8,
-                        bgcolor=ft.Colors.GREY_50 if month_num % 2 == 0 else ft.Colors.WHITE,
-                        border_radius=5
-                    )
-                )
-            
-            return ft.Column(analysis, spacing=3)
         
         def get_best_days_for_saving():
             """Определяет лучшие дни для начала накоплений на основе прогноза и аналитики"""
@@ -1091,13 +1856,9 @@ class MainApp:
             ft.Text(f"• Средние расходы: {monthly_expenses:,.0f} ₽/мес", size=14, color=ft.Colors.RED),
             ft.Text(f"• ChatGPT Plus: {chatgpt_cost:,.0f} ₽/мес", size=14, color=ft.Colors.ORANGE),
             ft.Text(f"• Квартплата: {rent_cost:,.0f} ₽/мес", size=14, color=ft.Colors.ORANGE),
-            ft.Text(f"• Сегодня: {datetime.datetime.now().strftime('%d %B %Y')}", size=14, color=ft.Colors.BLUE),
+            ft.Text(f"• Сегодня: {datetime.now().strftime('%d %B %Y')}", size=14, color=ft.Colors.BLUE),
             ft.Text(f"• Можете копить: {monthly_savings:,.0f} ₽/мес", size=14, color=ft.Colors.BLUE, weight=ft.FontWeight.BOLD) if monthly_savings > 0 else ft.Text("• Копить не нужно - конец месяца", size=14, color=ft.Colors.ORANGE),
             ft.Text(f"• Свободно для трат: {free_money:,.0f} ₽", size=14, color=ft.Colors.GREEN),
-            
-            ft.Divider(),
-            
-            get_detailed_monthly_analysis(),
             
             ft.Divider(),
             
@@ -1201,7 +1962,7 @@ class MainApp:
         
         # Анализ категорий трат
         transactions = self.finance_app.data["transactions"]
-        current_month = datetime.datetime.now().strftime("%Y-%m")
+        current_month = datetime.now().strftime("%Y-%m")
         
         categories = {}
         for transaction in transactions:
@@ -1332,6 +2093,196 @@ class MainApp:
             ]) for goal in goal_analysis]
         ], spacing=10)
     
+    def create_detailed_monthly_analysis(self):
+        """Создает детальный анализ по месяцам с максимальной информацией"""
+        current_month = datetime.now().month
+        months_analysis = self.get_months_analysis()
+        goals = self.finance_app.data["goals"]
+        goal_investments = self.finance_app.data["goal_investments"]
+        rent_cost = self.finance_app.data.get("rent_cost", 25000)
+        monthly_savings = self.finance_app.data["salary"] - self.calculate_average_monthly_expenses() - (3000 if self.finance_app.data["chatgpt_enabled"] else 0) - rent_cost
+        
+        # Рассчитываем общую сумму целей
+        total_goals = sum(goal["amount"] for goal in goals)
+        total_invested = sum(goal_investments.values())
+        remaining_goals = total_goals - total_invested
+        
+        # Создаем заголовок таблицы
+        header = ft.Container(
+            content=ft.Row([
+                ft.Text("Месяц", size=14, weight=ft.FontWeight.BOLD, expand=1),
+                ft.Text("Статус", size=14, weight=ft.FontWeight.BOLD, expand=1, text_align=ft.TextAlign.CENTER),
+                ft.Text("Праздники", size=14, weight=ft.FontWeight.BOLD, expand=1, text_align=ft.TextAlign.CENTER),
+                ft.Text("Дни рождения", size=14, weight=ft.FontWeight.BOLD, expand=1, text_align=ft.TextAlign.CENTER),
+                ft.Text("Доп. расходы", size=14, weight=ft.FontWeight.BOLD, expand=1, text_align=ft.TextAlign.CENTER),
+                ft.Text("Накопления", size=14, weight=ft.FontWeight.BOLD, expand=1, text_align=ft.TextAlign.CENTER),
+                ft.Text("Лучший для накоплений", size=14, weight=ft.FontWeight.BOLD, expand=1, text_align=ft.TextAlign.CENTER),
+                ft.Text("Детали", size=14, weight=ft.FontWeight.BOLD, expand=2, text_align=ft.TextAlign.CENTER)
+            ]),
+            bgcolor=ft.Colors.BLUE_50,
+            padding=12,
+            border=ft.border.all(1, ft.Colors.BLUE_200)
+        )
+        
+        # Создаем строки таблицы
+        table_rows = []
+        for month_num, data in months_analysis.items():
+            month_name = data["name"]
+            holiday_cost = data["cost"]
+            
+            # Получаем информацию о днях рождения
+            birthdays = self.get_birthdays_for_month(month_num)
+            birthday_names = [bday["name"] for bday in birthdays]
+            birthday_cost = sum(bday["gift_cost"] for bday in birthdays)
+            
+            # Рассчитываем общие дополнительные расходы
+            total_extra_costs = holiday_cost + birthday_cost
+            
+            # Рассчитываем доступную сумму для накоплений
+            available_for_savings = max(0, monthly_savings - total_extra_costs)
+            
+            # Умная логика определения статуса месяца
+            if total_extra_costs == 0:
+                status = "Отличный"
+                status_color = ft.Colors.GREEN
+                status_icon = "✅"
+                status_reason = "Никаких дополнительных трат"
+            elif total_extra_costs < monthly_savings * 0.2:
+                status = "Хороший"
+                status_color = ft.Colors.LIGHT_GREEN
+                status_icon = "👍"
+                status_reason = f"Доп. траты: {total_extra_costs:,.0f} ₽"
+            elif total_extra_costs < monthly_savings * 0.5:
+                status = "Осторожно"
+                status_color = ft.Colors.ORANGE
+                status_icon = "⚠️"
+                status_reason = f"Много доп. трат: {total_extra_costs:,.0f} ₽"
+            else:
+                status = "Опасно"
+                status_color = ft.Colors.RED
+                status_icon = "🚨"
+                status_reason = f"Критично много трат: {total_extra_costs:,.0f} ₽"
+            
+            # Формируем информацию о праздниках
+            holiday_info = "Нет праздников"
+            if holiday_cost > 0:
+                holiday_names = []
+                if month_num == 2:
+                    holiday_names.append("День святого Валентина")
+                if month_num == 3:
+                    holiday_names.append("8 Марта")
+                if month_num == 5:
+                    holiday_names.append("День Победы")
+                if month_num == 6:
+                    holiday_names.append("День России")
+                if month_num == 11:
+                    holiday_names.append("День народного единства")
+                if month_num == 12:
+                    holiday_names.append("Новый год")
+                holiday_info = f"{', '.join(holiday_names)}\n({holiday_cost:,.0f} ₽)"
+            
+            # Формируем информацию о днях рождения
+            birthday_info = "Нет ДР"
+            if birthday_names:
+                birthday_info = f"{', '.join(birthday_names)}\n({birthday_cost:,.0f} ₽)"
+            
+            # Определяем, является ли месяц лучшим для накоплений
+            if total_extra_costs == 0:
+                best_for_saving = "✅ Отличный"
+                best_color = ft.Colors.GREEN
+            elif total_extra_costs < monthly_savings * 0.2:
+                best_for_saving = "👍 Хороший"
+                best_color = ft.Colors.LIGHT_GREEN
+            elif total_extra_costs < monthly_savings * 0.5:
+                best_for_saving = "⚠️ Осторожно"
+                best_color = ft.Colors.ORANGE
+            else:
+                best_for_saving = "❌ Избегайте"
+                best_color = ft.Colors.RED
+            
+            # Формируем детальную информацию
+            if goals:
+                if available_for_savings > 0:
+                    months_to_goal = remaining_goals / available_for_savings if available_for_savings > 0 else 999
+                    details = f"Нужно накопить: {available_for_savings:,.0f} ₽\nДо цели: {months_to_goal:.1f} мес\nСвободно: {monthly_savings - total_extra_costs:,.0f} ₽"
+                else:
+                    details = f"Не копите в этом месяце\nСлишком много трат\nДефицит: {total_extra_costs - monthly_savings:,.0f} ₽"
+            else:
+                details = f"Нет цели\nДобавьте цель для планирования\nСвободно: {monthly_savings - total_extra_costs:,.0f} ₽"
+            
+            # Создаем строку таблицы
+            row = ft.Container(
+                content=ft.Row([
+                    ft.Text(month_name, size=12, weight=ft.FontWeight.BOLD, expand=1),
+                    ft.Column([
+                        ft.Text(f"{status_icon} {status}", size=12, color=status_color, text_align=ft.TextAlign.CENTER),
+                        ft.Text(status_reason, size=10, color=ft.Colors.GREY_600, text_align=ft.TextAlign.CENTER)
+                    ], expand=1, horizontal_alignment=ft.CrossAxisAlignment.CENTER),
+                    ft.Text(holiday_info, size=11, color=ft.Colors.PURPLE, expand=1, text_align=ft.TextAlign.CENTER),
+                    ft.Text(birthday_info, size=11, color=ft.Colors.PINK, expand=1, text_align=ft.TextAlign.CENTER),
+                    ft.Text(f"{total_extra_costs:,.0f} ₽", size=12, color=ft.Colors.RED if total_extra_costs > 0 else ft.Colors.GREY, expand=1, text_align=ft.TextAlign.CENTER),
+                    ft.Text(f"{available_for_savings:,.0f} ₽" if goals and available_for_savings > 0 else "Нет цели", 
+                           size=12, color=ft.Colors.GREEN if goals and available_for_savings > 0 else ft.Colors.GREY, 
+                           expand=1, text_align=ft.TextAlign.CENTER),
+                    ft.Text(best_for_saving, size=12, color=best_color, expand=1, text_align=ft.TextAlign.CENTER),
+                    ft.Text(details, size=10, color=ft.Colors.BLUE, expand=2, text_align=ft.TextAlign.CENTER)
+                ]),
+                bgcolor=ft.Colors.WHITE if month_num % 2 == 0 else ft.Colors.GREY_50,
+                padding=10,
+                border=ft.border.all(0.5, ft.Colors.GREY_300)
+            )
+            table_rows.append(row)
+        
+        # Создаем итоговую информацию
+        summary = ft.Container(
+            content=ft.Column([
+                ft.Text("📊 Итоговая информация:", size=16, weight=ft.FontWeight.BOLD),
+                ft.Text(f"• Общая сумма целей: {total_goals:,.0f} ₽" if goals else "• Нет целей", size=14),
+                ft.Text(f"• Уже накоплено: {total_invested:,.0f} ₽" if goals else "", size=14),
+                ft.Text(f"• Осталось накопить: {remaining_goals:,.0f} ₽" if goals else "", size=14),
+                ft.Text(f"• Средние накопления: {monthly_savings:,.0f} ₽/месяц", size=14),
+                ft.Text(f"• Время до всех целей: {remaining_goals / monthly_savings:.1f} месяцев" if goals and monthly_savings > 0 else "", size=14)
+            ], spacing=5),
+            bgcolor=ft.Colors.LIGHT_BLUE_50,
+            padding=15,
+            border=ft.border.all(1, ft.Colors.BLUE_200)
+        )
+        
+        # Добавляем объяснение оценок
+        explanation = ft.Container(
+            content=ft.Column([
+                ft.Text("📊 Объяснение оценок для накоплений:", size=14, weight=ft.FontWeight.BOLD),
+                ft.Row([
+                    ft.Text("✅ Отличный", size=12, color=ft.Colors.GREEN),
+                    ft.Text("- нет дополнительных трат", size=11, color=ft.Colors.GREY_600)
+                ], spacing=5),
+                ft.Row([
+                    ft.Text("👍 Хороший", size=12, color=ft.Colors.LIGHT_GREEN),
+                    ft.Text("- мало дополнительных трат (<20%)", size=11, color=ft.Colors.GREY_600)
+                ], spacing=5),
+                ft.Row([
+                    ft.Text("⚠️ Осторожно", size=12, color=ft.Colors.ORANGE),
+                    ft.Text("- умеренные дополнительные траты (20-50%)", size=11, color=ft.Colors.GREY_600)
+                ], spacing=5),
+                ft.Row([
+                    ft.Text("❌ Избегайте", size=12, color=ft.Colors.RED),
+                    ft.Text("- много дополнительных трат (>50%)", size=11, color=ft.Colors.GREY_600)
+                ], spacing=5)
+            ], spacing=3),
+            padding=15,
+            bgcolor=ft.Colors.BLUE_50,
+            border=ft.border.all(1, ft.Colors.BLUE_200)
+        )
+        
+        return ft.Column([
+            header,
+            *table_rows,
+            ft.Divider(),
+            summary,
+            ft.Divider(),
+            explanation
+        ], spacing=0)
+    
     def create_action_plan(self):
         current_money = self.finance_app.data["current_money"]
         safety_reserve = self.finance_app.data["safety_reserve"]
@@ -1370,7 +2321,7 @@ class MainApp:
         ], spacing=8)
     
     def get_next_salary_date(self):
-        today = datetime.datetime.now()
+        today = datetime.now()
         current_day = today.day
         salary_dates = self.finance_app.data["salary_dates"]
         
@@ -1384,12 +2335,22 @@ class MainApp:
         return next_month.replace(day=min(salary_dates))
     
     def calculate_daily_budget(self):
+        """Рассчитывает правильный дневной бюджет с учетом резерва"""
         current_money = self.finance_app.data["current_money"]
-        days_until_salary = (self.get_next_salary_date() - datetime.datetime.now()).days
+        safety_reserve = self.finance_app.data["safety_reserve"]
+        free_money = current_money - safety_reserve
         
-        if days_until_salary > 0:
-            return current_money / days_until_salary
-        return 0
+        salary_date = self.finance_app.data["salary_dates"][0]
+        days_until_salary = self.calculate_days_until_salary(salary_date)
+        
+        if days_until_salary <= 0 or free_money <= 0:
+            return 0
+        
+        if free_money < 1000:
+            return free_money / days_until_salary
+        
+        available_for_daily = max(0, free_money - 2000)
+        return available_for_daily / days_until_salary
     
     def update_salary(self, e):
         try:
@@ -1774,7 +2735,7 @@ class MainApp:
             "type": "expense",
             "amount": rent_amount,
             "description": "Оплата квартплаты",
-            "date": datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+            "date": datetime.now().strftime("%Y-%m-%d %H:%M")
         }
         
         self.finance_app.data["transactions"].append(transaction)
@@ -1814,7 +2775,7 @@ class MainApp:
             return ft.Text("Квартплата не настроена", size=12, color=ft.Colors.GREY_600)
         
         try:
-            paid_until_date = datetime.datetime.strptime(rent_paid_until, "%Y-%m-%d").date()
+            paid_until_date = datetime.strptime(rent_paid_until, "%Y-%m-%d").date()
             today = datetime.date.today()
             
             if paid_until_date > today:
@@ -1838,7 +2799,7 @@ class MainApp:
             return False
         
         try:
-            paid_until_date = datetime.datetime.strptime(rent_paid_until, "%Y-%m-%d").date()
+            paid_until_date = datetime.strptime(rent_paid_until, "%Y-%m-%d").date()
             today = datetime.date.today()
             return today >= paid_until_date
         except:
@@ -1886,7 +2847,7 @@ class MainApp:
             invested_amount = self.finance_app.data["goal_investments"].get(goal_name, 0)
             
             try:
-                goal_date = datetime.datetime.strptime(goal["date"], "%Y-%m-%d").date()
+                goal_date = datetime.strptime(goal["date"], "%Y-%m-%d").date()
                 today = datetime.date.today()
                 days_left = (goal_date - today).days
                 
@@ -1994,7 +2955,7 @@ class MainApp:
             goal_name = goal["name"]
             invested_amount = self.finance_app.data["goal_investments"].get(goal_name, 0)
             
-            goal_date = datetime.datetime.strptime(goal["date"], "%Y-%m-%d").date()
+            goal_date = datetime.strptime(goal["date"], "%Y-%m-%d").date()
             today = datetime.date.today()
             
             if goal_date <= today:
@@ -2178,7 +3139,7 @@ class MainApp:
         
         for goal in goals:
             try:
-                goal_date = datetime.datetime.strptime(goal["date"], "%Y-%m-%d").date()
+                goal_date = datetime.strptime(goal["date"], "%Y-%m-%d").date()
                 days_left = (goal_date - today).days
                 invested = goal_investments.get(goal["name"], 0)
                 remaining = goal["amount"] - invested
@@ -2203,7 +3164,7 @@ class MainApp:
     
     def create_expense_statistics(self):
         transactions = self.finance_app.data["transactions"]
-        current_month = datetime.datetime.now().strftime("%Y-%m")
+        current_month = datetime.now().strftime("%Y-%m")
         
         monthly_expenses = sum(
             t["amount"] for t in transactions 
@@ -2303,7 +3264,7 @@ class MainApp:
                         "amount": amount,
                         "description": description,
                         "category": category,
-                        "date": datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+                        "date": datetime.now().strftime("%Y-%m-%d %H:%M")
                     }
                     
                     self.finance_app.data["transactions"].append(transaction)
@@ -2345,8 +3306,8 @@ class MainApp:
             
             if name and amount > 0 and date_str:
                 try:
-                    date_obj = datetime.datetime.strptime(date_str, "%Y-%m-%d")
-                    if date_obj.date() <= datetime.datetime.now().date():
+                    date_obj = datetime.strptime(date_str, "%Y-%m-%d")
+                    if date_obj.date() <= datetime.now().date():
                         self.goal_date_field.error_text = "Дата должна быть в будущем"
                         self.page.update()
                         return
@@ -2392,7 +3353,7 @@ class MainApp:
                         "type": "goal_investment",
                         "amount": amount,
                         "description": f"Перевод в цель: {goal_name}",
-                        "date": datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+                        "date": datetime.now().strftime("%Y-%m-%d %H:%M")
                     }
                     
                     self.finance_app.data["transactions"].append(transaction)
@@ -2462,7 +3423,7 @@ class MainApp:
         monthly_income = salary
         
         # Дневной бюджет с учетом резерва
-        days_until_salary = (self.get_next_salary_date() - datetime.datetime.now()).days
+        days_until_salary = self.calculate_days_until_salary(self.finance_app.data["salary_dates"][0])
         daily_budget = available_for_spending / max(days_until_salary, 1)
         
         if price <= available_for_spending:
@@ -2640,7 +3601,7 @@ class MainApp:
     def get_current_month_expenses(self):
         """Получает расходы за текущий месяц"""
         transactions = self.finance_app.data["transactions"]
-        current_month = datetime.datetime.now().strftime("%Y-%m")
+        current_month = datetime.now().strftime("%Y-%m")
         
         current_expenses = sum(
             t["amount"] for t in transactions 
@@ -2651,7 +3612,7 @@ class MainApp:
     def get_current_month_income(self):
         """Получает доходы за текущий месяц"""
         transactions = self.finance_app.data["transactions"]
-        current_month = datetime.datetime.now().strftime("%Y-%m")
+        current_month = datetime.now().strftime("%Y-%m")
         
         current_income = sum(
             t["amount"] for t in transactions 
@@ -2738,9 +3699,37 @@ class MainApp:
                     )
                 )
             )
+        elif current_money < safety_reserve * 1.2:
+            alerts.append(
+                ft.Card(
+                    content=ft.Container(
+                        content=ft.Column([
+                            ft.Text("⚠️ НИЗКИЙ РЕЗЕРВ", size=18, weight=ft.FontWeight.BOLD, color=ft.Colors.ORANGE),
+                            ft.Text(f"У вас {current_money:,.0f} ₽, резерв {safety_reserve:,.0f} ₽", size=16),
+                            ft.Text("Рекомендуется пополнить счет", size=14, color=ft.Colors.ORANGE)
+                        ], spacing=5),
+                        padding=15,
+                        bgcolor=ft.Colors.ORANGE_50
+                    )
+                )
+            )
+        else:
+            alerts.append(
+                ft.Card(
+                    content=ft.Container(
+                        content=ft.Column([
+                            ft.Text("✅ РЕЗЕРВ В ПОРЯДКЕ", size=18, weight=ft.FontWeight.BOLD, color=ft.Colors.GREEN),
+                            ft.Text(f"У вас {current_money:,.0f} ₽, резерв {safety_reserve:,.0f} ₽", size=16),
+                            ft.Text("Финансовая безопасность обеспечена", size=14, color=ft.Colors.GREEN)
+                        ], spacing=5),
+                        padding=15,
+                        bgcolor=ft.Colors.GREEN_50
+                    )
+                )
+            )
         
         # Предупреждение о квартплате
-        elif rent_due and rent > 0:
+        if rent_due and rent > 0:
             alerts.append(
                 ft.Card(
                     content=ft.Container(
@@ -2756,7 +3745,7 @@ class MainApp:
             )
         
         # Предупреждение о низком резерве
-        elif current_money < safety_reserve * 1.5:
+        if current_money < safety_reserve * 1.5:
             alerts.append(
                 ft.Card(
                     content=ft.Container(
@@ -2929,7 +3918,7 @@ class MainApp:
                 )
         
         # Праздничные рекомендации
-        current_month = datetime.datetime.now().month
+        current_month = datetime.now().month
         if current_month == 12:
             recommendations.append(
                 ft.Text("🎄 Новый год: отложите 15,000-30,000 ₽ на подарки", 
@@ -2978,7 +3967,7 @@ class MainApp:
     
     def analyze_expense_categories(self):
         transactions = self.finance_app.data["transactions"]
-        current_month = datetime.datetime.now().strftime("%Y-%m")
+        current_month = datetime.now().strftime("%Y-%m")
         
         categories = {}
         category_names = {
@@ -3005,8 +3994,8 @@ class MainApp:
         transactions = self.finance_app.data["transactions"]
         
         # Сравниваем последние 2 месяца
-        current_month = datetime.datetime.now().strftime("%Y-%m")
-        last_month = (datetime.datetime.now() - datetime.timedelta(days=30)).strftime("%Y-%m")
+        current_month = datetime.now().strftime("%Y-%m")
+        last_month = (datetime.now() - timedelta(days=30)).strftime("%Y-%m")
         
         current_expenses = sum(t["amount"] for t in transactions 
                              if t["type"] == "expense" and t["date"].startswith(current_month))
@@ -3030,7 +4019,7 @@ class MainApp:
         # Создаем данные за последние 6 месяцев
         months_data = []
         for i in range(6):
-            month_date = datetime.datetime.now() - datetime.timedelta(days=30*i)
+            month_date = datetime.now() - timedelta(days=30*i)
             month_str = month_date.strftime("%Y-%m")
             month_name = month_date.strftime("%b")
             
@@ -3058,7 +4047,7 @@ class MainApp:
         ], spacing=5)
     
     def create_holiday_planning(self):
-        current_month = datetime.datetime.now().month
+        current_month = datetime.now().month
         current_money = self.finance_app.data["current_money"]
         salary = self.finance_app.data["salary"]
         
@@ -3131,7 +4120,7 @@ class MainApp:
         
         current_balance = current_money
         for month in range(1, 13):
-            month_date = datetime.datetime.now() + datetime.timedelta(days=30*month)
+            month_date = datetime.now() + timedelta(days=30*month)
             month_name = month_date.strftime("%B %Y")
             
             # Учитываем праздники
@@ -3201,7 +4190,7 @@ class MainApp:
             )
         
         # Сезонные советы
-        current_month = datetime.datetime.now().month
+        current_month = datetime.now().month
         if current_month == 12:
             tips.append(
                 ft.Text("🎄 СОВЕТ: Покупайте подарки заранее - в декабре цены выше", 
@@ -3364,10 +4353,10 @@ class MainApp:
         current_month_income = self.get_current_month_income()
         
         # Оставшиеся дни в месяце
-        current_day = datetime.datetime.now().day
+        current_day = datetime.now().day
         import calendar
-        current_year = datetime.datetime.now().year
-        current_month = datetime.datetime.now().month
+        current_year = datetime.now().year
+        current_month = datetime.now().month
         days_in_month = calendar.monthrange(current_year, current_month)[1]
         remaining_days = days_in_month - current_day + 1
         
@@ -3394,7 +4383,7 @@ class MainApp:
         
         return ft.Column([
             ft.Text("💳 Мои деньги (реальные данные):", size=16, weight=ft.FontWeight.BOLD),
-            ft.Text(f"📅 Сегодня: {datetime.datetime.now().strftime('%d %B %Y')}", size=12, color=ft.Colors.GREY_600),
+            ft.Text(f"📅 Сегодня: {datetime.now().strftime('%d %B %Y')}", size=12, color=ft.Colors.GREY_600),
             ft.Text(f"⏰ Осталось дней в месяце: {remaining_days}", size=12, color=ft.Colors.GREY_600),
             ft.Divider(),
             ft.Row([
@@ -3439,7 +4428,7 @@ class MainApp:
         game_transactions = [t for t in self.finance_app.data["transactions"] 
                            if t.get("category") == "games"]
         monthly_game_spending = sum(t["amount"] for t in game_transactions 
-                                  if t["type"] == "expense" and t["date"].startswith(datetime.datetime.now().strftime("%Y-%m")))
+                                  if t["type"] == "expense" and t["date"].startswith(datetime.now().strftime("%Y-%m")))
         
         salary = self.finance_app.data["salary"]
         recommended_game_budget = salary * 0.05  # 5% от дохода на игры
@@ -3481,7 +4470,7 @@ class MainApp:
         food_transactions = [t for t in self.finance_app.data["transactions"] 
                            if t.get("category") in ["food", "restaurants"]]
         monthly_food_spending = sum(t["amount"] for t in food_transactions 
-                                  if t["type"] == "expense" and t["date"].startswith(datetime.datetime.now().strftime("%Y-%m")))
+                                  if t["type"] == "expense" and t["date"].startswith(datetime.now().strftime("%Y-%m")))
         
         salary = self.finance_app.data["salary"]
         recommended_food_budget = salary * 0.15  # 15% от дохода на еду
@@ -3523,7 +4512,7 @@ class MainApp:
         electronics_transactions = [t for t in self.finance_app.data["transactions"] 
                                   if t.get("category") == "electronics"]
         monthly_electronics_spending = sum(t["amount"] for t in electronics_transactions 
-                                         if t["type"] == "expense" and t["date"].startswith(datetime.datetime.now().strftime("%Y-%m")))
+                                         if t["type"] == "expense" and t["date"].startswith(datetime.now().strftime("%Y-%m")))
         
         salary = self.finance_app.data["salary"]
         recommended_electronics_budget = salary * 0.15  # 15% от дохода на электронику
@@ -3563,7 +4552,7 @@ class MainApp:
     def create_my_monthly_analysis(self):
         # Анализ по месяцам
         transactions = self.finance_app.data["transactions"]
-        current_year = datetime.datetime.now().year
+        current_year = datetime.now().year
         
         monthly_data = {}
         for month in range(1, 13):
@@ -3731,11 +4720,11 @@ class MainApp:
         available_for_savings = current_money - safety_reserve
         
         # Анализ лучших месяцев для накоплений
-        current_month = datetime.datetime.now().month
+        current_month = datetime.now().month
         
         # Основные праздники и их влияние на накопления
         holiday_months = {
-            1: {"name": "Январь", "holiday": "Новый год", "cost": 15000, "risk": "Высокий", "advice": "Не начинай накопления"},
+            1: {"name": "Январь", "holiday": "", "cost": 0, "risk": "Низкий", "advice": "Отличный месяц для накоплений"},
             2: {"name": "Февраль", "holiday": "День Святого Валентина", "cost": 5000, "risk": "Средний", "advice": "Осторожно с накоплениями"},
             3: {"name": "Март", "holiday": "8 Марта", "cost": 3000, "risk": "Низкий", "advice": "Можно начинать"},
             4: {"name": "Апрель", "holiday": "Нет", "cost": 0, "risk": "Низкий", "advice": "Отличный месяц для накоплений"},
@@ -3799,7 +4788,7 @@ class MainApp:
             ft.Text(f"• {', '.join([holiday_months[m]['name'] for m in good_months])}", size=12),
             
             ft.Text("🔴 Избегай (большие праздники):", size=14, color=ft.Colors.RED),
-            ft.Text("• Январь (Новый год), Декабрь (Новый год)", size=12),
+            ft.Text("• Декабрь (Новый год)", size=12),
             
             ft.Divider(),
             
@@ -3930,10 +4919,10 @@ class MainApp:
         ], spacing=20, scroll=ft.ScrollMode.AUTO)
     
     def get_salary_status(self):
-        current_day = datetime.datetime.now().day
-        current_month = datetime.datetime.now().month
+        current_day = datetime.now().day
+        current_month = datetime.now().month
         current_year = 2025
-        current_year = datetime.datetime.now().year
+        current_year = datetime.now().year
         salary_dates = self.finance_app.data["salary_dates"]
         salary = self.finance_app.data["salary"]
         
@@ -3966,7 +4955,7 @@ class MainApp:
         rent_cost = self.finance_app.data.get("rent_cost", 25000)  # Квартплата из настроек или 25,000 по умолчанию
         
         # Получаем текущий месяц
-        current_month = datetime.datetime.now().month
+        current_month = datetime.now().month
         current_year = 2025  # Устанавливаем 2025 год
         
         def should_pay_rent(month, year):
@@ -3976,9 +4965,9 @@ class MainApp:
             
             try:
                 # Парсим дату "до которой уплачена квартплата"
-                paid_until = datetime.datetime.strptime(rent_paid_until, "%Y-%m-%d")
+                paid_until = datetime.strptime(rent_paid_until, "%Y-%m-%d")
                 # Квартплата платится 10 числа каждого месяца
-                target_date = datetime.datetime(year, month, 10)
+                target_date = datetime(year, month, 10)
                 
                 # Если целевой месяц раньше даты уплаты, НЕ нужно платить
                 # Например: если квартплата уплачена до 2025-10-10,
@@ -3990,7 +4979,7 @@ class MainApp:
         
         # Основные праздники и их стоимость
         holidays = {
-            1: {"name": "Новый год", "cost": 15000, "description": "Подарки, еда, развлечения"},
+            1: {"name": "", "cost": 0, "description": ""},
             2: {"name": "День Святого Валентина", "cost": 5000, "description": "Подарок девушке, ужин"},
             3: {"name": "8 Марта", "cost": 3000, "description": "Подарок маме и девушке"},
             12: {"name": "Новый год", "cost": 20000, "description": "Подарки, еда, празднование"}
@@ -4024,9 +5013,9 @@ class MainApp:
             
             # Если это текущий месяц, проверяем, сколько зарплат уже получено
             if i == 0:  # Текущий месяц
-                current_day = datetime.datetime.now().day
-                current_month = datetime.datetime.now().month
-                current_year = datetime.datetime.now().year
+                current_day = datetime.now().day
+                current_month = datetime.now().month
+                current_year = datetime.now().year
                 
                 # Проверяем, какой сейчас месяц в прогнозе
                 forecast_month = ((current_month - 1 + i) % 12) + 1
@@ -4062,9 +5051,9 @@ class MainApp:
             expenses = 0  # Инициализируем переменную
             holiday_cost = 0  # Инициализируем переменную
             if i == 0:  # Текущий месяц
-                current_day = datetime.datetime.now().day
-                current_month = datetime.datetime.now().month
-                current_year = datetime.datetime.now().year
+                current_day = datetime.now().day
+                current_month = datetime.now().month
+                current_year = datetime.now().year
                 forecast_month = ((current_month - 1 + i) % 12) + 1
                 forecast_year = current_year + ((current_month - 1 + i) // 12)
                 
@@ -4139,7 +5128,7 @@ class MainApp:
                         ft.Text(f"• Уплачена до: {rent_paid_until if rent_paid_until else 'Не указано'}", size=12, color=ft.Colors.BLUE),
                         ft.Text(f"• ChatGPT Plus: {chatgpt_cost:,.0f} ₽/месяц", size=12),
                         ft.Text(f"• Резерв безопасности: {safety_reserve:,.0f} ₽", size=12),
-                        ft.Text(f"• Сегодня: {datetime.datetime.now().strftime('%d %B %Y')}", size=12, weight=ft.FontWeight.BOLD),
+                        ft.Text(f"• Сегодня: {datetime.now().strftime('%d %B %Y')}", size=12, weight=ft.FontWeight.BOLD),
                         self.get_salary_status(),
                         ft.Text(f"• Начинаем с: {['', 'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'][current_month]}", size=12, weight=ft.FontWeight.BOLD)
                     ], spacing=5),
@@ -4147,51 +5136,138 @@ class MainApp:
                 )
             ),
             
-            # Заголовок таблицы
+            # Детальный заголовок таблицы
             ft.Container(
                 content=ft.Row([
                     ft.Text("Месяц", size=14, weight=ft.FontWeight.BOLD, expand=2),
                     ft.Text("Доходы", size=14, weight=ft.FontWeight.BOLD, expand=1, text_align=ft.TextAlign.CENTER),
                     ft.Text("Расходы", size=14, weight=ft.FontWeight.BOLD, expand=1, text_align=ft.TextAlign.CENTER),
+                    ft.Text("Праздники", size=14, weight=ft.FontWeight.BOLD, expand=1, text_align=ft.TextAlign.CENTER),
                     ft.Text("Баланс", size=14, weight=ft.FontWeight.BOLD, expand=1, text_align=ft.TextAlign.CENTER),
-                    ft.Text("Праздники", size=14, weight=ft.FontWeight.BOLD, expand=1, text_align=ft.TextAlign.CENTER)
+                    ft.Text("Статус", size=14, weight=ft.FontWeight.BOLD, expand=1, text_align=ft.TextAlign.CENTER),
+                    ft.Text("Детали", size=14, weight=ft.FontWeight.BOLD, expand=2, text_align=ft.TextAlign.CENTER)
                 ]),
                 bgcolor=ft.Colors.BLUE_50,
                 padding=12,
-                border_radius=8,
                 border=ft.border.all(1, ft.Colors.BLUE_200)
             ),
             
-            # Строки таблицы
+            # Детальные строки таблицы
             ft.Column([
                 ft.Container(
                     content=ft.Row([
+                        # Месяц и праздники
                         ft.Column([
                             ft.Text(f"{forecast['month']}", size=13, weight=ft.FontWeight.BOLD),
-                            ft.Text(f"{forecast['holiday']}", size=10, color=ft.Colors.PURPLE) if forecast['holiday'] else ft.Text("", size=10)
+                            ft.Text(f"{forecast['holiday']}", size=10, color=ft.Colors.PURPLE) if forecast['holiday'] else ft.Text("Нет праздников", size=10, color=ft.Colors.GREY_600)
                         ], expand=2),
-                        ft.Text(f"{forecast['income']:,.0f} ₽", size=12, color=ft.Colors.GREEN, expand=1, text_align=ft.TextAlign.CENTER),
-                        ft.Text(f"{forecast['expenses']:,.0f} ₽", size=12, color=ft.Colors.RED, expand=1, text_align=ft.TextAlign.CENTER),
-                        ft.Text(f"{forecast['balance']:,.0f} ₽", size=12, 
-                               color=ft.Colors.GREEN if forecast['balance'] > safety_reserve else ft.Colors.RED, 
-                               expand=1, text_align=ft.TextAlign.CENTER),
-                        ft.Text(f"{forecast['holiday_cost']:,.0f} ₽" if forecast['holiday_cost'] > 0 else "—", 
-                               size=11, color=ft.Colors.PURPLE, expand=1, text_align=ft.TextAlign.CENTER)
+                        
+                        # Доходы
+                        ft.Column([
+                            ft.Text(f"{forecast['income']:,.0f} ₽", size=12, color=ft.Colors.GREEN, text_align=ft.TextAlign.CENTER),
+                            ft.Text("2 зарплаты", size=9, color=ft.Colors.GREY_600, text_align=ft.TextAlign.CENTER) if forecast['income'] > 0 else ft.Text("Нет", size=9, color=ft.Colors.GREY_600, text_align=ft.TextAlign.CENTER)
+                        ], expand=1, horizontal_alignment=ft.CrossAxisAlignment.CENTER),
+                        
+                        # Расходы
+                        ft.Column([
+                            ft.Text(f"{forecast['expenses']:,.0f} ₽", size=12, color=ft.Colors.RED, text_align=ft.TextAlign.CENTER),
+                            ft.Text("Все расходы", size=9, color=ft.Colors.GREY_600, text_align=ft.TextAlign.CENTER)
+                        ], expand=1, horizontal_alignment=ft.CrossAxisAlignment.CENTER),
+                        
+                        # Праздники
+                        ft.Column([
+                            ft.Text(f"{forecast['holiday_cost']:,.0f} ₽" if forecast['holiday_cost'] > 0 else "—", 
+                                   size=12, color=ft.Colors.PURPLE, text_align=ft.TextAlign.CENTER),
+                            ft.Text("Подарки", size=9, color=ft.Colors.GREY_600, text_align=ft.TextAlign.CENTER) if forecast['holiday_cost'] > 0 else ft.Text("", size=9, text_align=ft.TextAlign.CENTER)
+                        ], expand=1, horizontal_alignment=ft.CrossAxisAlignment.CENTER),
+                        
+                        # Баланс
+                        ft.Column([
+                            ft.Text(f"{forecast['balance']:,.0f} ₽", size=12, 
+                                   color=ft.Colors.GREEN if forecast['balance'] > safety_reserve else ft.Colors.RED, 
+                                   text_align=ft.TextAlign.CENTER),
+                            ft.Text(f"Резерв: {safety_reserve:,.0f}", size=9, color=ft.Colors.GREY_600, text_align=ft.TextAlign.CENTER)
+                        ], expand=1, horizontal_alignment=ft.CrossAxisAlignment.CENTER),
+                        
+                        # Статус
+                        ft.Column([
+                            ft.Text("✅ Отлично" if forecast['balance'] > safety_reserve * 1.5 else 
+                                   "👍 Хорошо" if forecast['balance'] > safety_reserve else 
+                                   "⚠️ Осторожно" if forecast['balance'] > 0 else "❌ Критично", 
+                                   size=11, 
+                                   color=ft.Colors.GREEN if forecast['balance'] > safety_reserve else 
+                                         ft.Colors.ORANGE if forecast['balance'] > 0 else ft.Colors.RED,
+                                   text_align=ft.TextAlign.CENTER),
+                            ft.Text(f"Свободно: {forecast['balance'] - safety_reserve:,.0f}" if forecast['balance'] > safety_reserve else 
+                                   f"Дефицит: {safety_reserve - forecast['balance']:,.0f}", 
+                                   size=9, color=ft.Colors.GREY_600, text_align=ft.TextAlign.CENTER)
+                        ], expand=1, horizontal_alignment=ft.CrossAxisAlignment.CENTER),
+                        
+                        # Детали
+                        ft.Column([
+                            ft.Text(f"Доход: {forecast['income']:,.0f}", size=10, color=ft.Colors.GREEN),
+                            ft.Text(f"Расход: {forecast['expenses']:,.0f}", size=10, color=ft.Colors.RED),
+                            ft.Text(f"Праздник: {forecast['holiday_cost']:,.0f}", size=10, color=ft.Colors.PURPLE) if forecast['holiday_cost'] > 0 else ft.Text("", size=10),
+                            ft.Text(f"Итого: {forecast['income'] - forecast['expenses']:,.0f}", size=10, 
+                                   color=ft.Colors.GREEN if forecast['income'] - forecast['expenses'] > 0 else ft.Colors.RED)
+                        ], expand=2, horizontal_alignment=ft.CrossAxisAlignment.START)
                     ]),
                     bgcolor=ft.Colors.WHITE if i % 2 == 0 else ft.Colors.GREY_50,
-                    padding=10,
-                    border_radius=5,
+                    padding=12,
                     border=ft.border.all(0.5, ft.Colors.GREY_300)
                 ) for i, forecast in enumerate(monthly_forecast)
             ], spacing=1),
             
             ft.Divider(),
             
-            ft.Text("💡 Выводы:", size=16, weight=ft.FontWeight.BOLD),
-            ft.Text("• Самые дорогие месяцы: январь и декабрь (Новый год)", size=12),
-            ft.Text("• Самые дешевые месяцы: летние", size=12),
-            ft.Text("• Планируй подарки заранее", size=12),
-            ft.Text("• Откладывай деньги на праздники", size=12)
+            # Детальная статистика
+            ft.Container(
+                content=ft.Column([
+                    ft.Text("📊 Детальная статистика прогноза:", size=16, weight=ft.FontWeight.BOLD),
+                    
+                    # Находим лучший и худший месяцы
+                    ft.Row([
+                        ft.Column([
+                            ft.Text("🏆 Лучший месяц:", size=14, weight=ft.FontWeight.BOLD, color=ft.Colors.GREEN),
+                            ft.Text(f"{max(monthly_forecast, key=lambda x: x['balance'])['month']}", size=12, color=ft.Colors.GREEN),
+                            ft.Text(f"Баланс: {max(monthly_forecast, key=lambda x: x['balance'])['balance']:,.0f} ₽", size=11, color=ft.Colors.GREEN)
+                        ], expand=1),
+                        
+                        ft.Column([
+                            ft.Text("⚠️ Сложный месяц:", size=14, weight=ft.FontWeight.BOLD, color=ft.Colors.RED),
+                            ft.Text(f"{min(monthly_forecast, key=lambda x: x['balance'])['month']}", size=12, color=ft.Colors.RED),
+                            ft.Text(f"Баланс: {min(monthly_forecast, key=lambda x: x['balance'])['balance']:,.0f} ₽", size=11, color=ft.Colors.RED)
+                        ], expand=1)
+                    ], spacing=20),
+                    
+                    ft.Divider(),
+                    
+                    # Общая статистика
+                    ft.Text("💰 Общая статистика за год:", size=14, weight=ft.FontWeight.BOLD),
+                    ft.Text(f"• Общий доход: {sum(f['income'] for f in monthly_forecast):,.0f} ₽", size=12, color=ft.Colors.GREEN),
+                    ft.Text(f"• Общие расходы: {sum(f['expenses'] for f in monthly_forecast):,.0f} ₽", size=12, color=ft.Colors.RED),
+                    ft.Text(f"• На праздники: {sum(f['holiday_cost'] for f in monthly_forecast):,.0f} ₽", size=12, color=ft.Colors.PURPLE),
+                    ft.Text(f"• Итоговый баланс: {monthly_forecast[-1]['balance']:,.0f} ₽", size=12, 
+                           color=ft.Colors.GREEN if monthly_forecast[-1]['balance'] > safety_reserve else ft.Colors.RED),
+                    ft.Text(f"• Свободных денег: {monthly_forecast[-1]['balance'] - safety_reserve:,.0f} ₽", size=12, 
+                           color=ft.Colors.BLUE if monthly_forecast[-1]['balance'] > safety_reserve else ft.Colors.ORANGE),
+                    
+                    ft.Divider(),
+                    
+                    # Рекомендации
+                    ft.Text("💡 Умные рекомендации:", size=14, weight=ft.FontWeight.BOLD),
+                    ft.Text("• Самый дорогой месяц: декабрь (Новый год)", size=12),
+                    ft.Text("• Самые дешевые месяцы: летние", size=12),
+                    ft.Text("• Планируй подарки заранее", size=12),
+                    ft.Text("• Откладывай деньги на праздники", size=12),
+                    ft.Text("• Следи за резервом безопасности", size=12),
+                    ft.Text("• Используй скидки и акции", size=12)
+                ], spacing=8),
+                padding=15,
+                bgcolor=ft.Colors.LIGHT_BLUE_50,
+                border_radius=8,
+                border=ft.border.all(1, ft.Colors.BLUE_200)
+            )
         ], spacing=5)
     
     def create_holidays_forecast(self):
@@ -4429,7 +5505,7 @@ class MainApp:
         game_transactions = [t for t in self.finance_app.data["transactions"] 
                            if t.get("category") == "games"]
         monthly_game_spending = sum(t["amount"] for t in game_transactions 
-                                  if t["type"] == "expense" and t["date"].startswith(datetime.datetime.now().strftime("%Y-%m")))
+                                  if t["type"] == "expense" and t["date"].startswith(datetime.now().strftime("%Y-%m")))
         
         # Рекомендации по играм
         recommended_game_budget = wants_budget * 0.2  # 20% от бюджета желаний на игры
@@ -4485,7 +5561,7 @@ class MainApp:
         food_transactions = [t for t in self.finance_app.data["transactions"] 
                            if t.get("category") in ["food", "restaurants"]]
         monthly_food_spending = sum(t["amount"] for t in food_transactions 
-                                  if t["type"] == "expense" and t["date"].startswith(datetime.datetime.now().strftime("%Y-%m")))
+                                  if t["type"] == "expense" and t["date"].startswith(datetime.now().strftime("%Y-%m")))
         
         # Рекомендации по еде
         recommended_food_budget = salary * 0.15  # 15% от дохода на еду
@@ -4570,7 +5646,7 @@ class MainApp:
         subscription_transactions = [t for t in self.finance_app.data["transactions"] 
                                    if any(word in t["description"].lower() for word in ["подписка", "subscription", "netflix", "spotify", "youtube", "microsoft", "adobe", "playstation", "xbox"])]
         monthly_subscription_spending = sum(t["amount"] for t in subscription_transactions 
-                                          if t["type"] == "expense" and t["date"].startswith(datetime.datetime.now().strftime("%Y-%m")))
+                                          if t["type"] == "expense" and t["date"].startswith(datetime.now().strftime("%Y-%m")))
         
         # Добавляем ChatGPT если включен
         if self.finance_app.data["chatgpt_enabled"]:
@@ -5458,7 +6534,7 @@ class MainApp:
         monthly_expenses = self.calculate_average_monthly_expenses()
         
         # Статистика за год
-        current_year = datetime.datetime.now().year
+        current_year = datetime.now().year
         year_income = sum(t["amount"] for t in transactions 
                          if t["type"] == "income" and str(current_year) in t["date"])
         year_expenses = sum(t["amount"] for t in transactions 
@@ -5796,7 +6872,7 @@ class MainApp:
                     "title": title,
                     "content": content,
                     "category": category,
-                    "date": datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
+                    "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
                     "id": len(self.finance_app.data["notes"]) + 1
                 }
                 self.finance_app.data["notes"].append(note)
