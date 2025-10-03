@@ -5205,12 +5205,12 @@ class MainApp:
                         
                         # Детали
                         ft.Column([
-                            ft.Text(f"Доход: {forecast['income']:,.0f}", size=10, color=ft.Colors.GREEN),
-                            ft.Text(f"Расход: {forecast['expenses']:,.0f}", size=10, color=ft.Colors.RED),
-                            ft.Text(f"Праздник: {forecast['holiday_cost']:,.0f}", size=10, color=ft.Colors.PURPLE) if forecast['holiday_cost'] > 0 else ft.Text("", size=10),
+                            ft.Text(f"Доход: {forecast['income']:,.0f}", size=10, color=ft.Colors.GREEN, text_align=ft.TextAlign.CENTER),
+                            ft.Text(f"Расход: {forecast['expenses']:,.0f}", size=10, color=ft.Colors.RED, text_align=ft.TextAlign.CENTER),
+                            ft.Text(f"Праздник: {forecast['holiday_cost']:,.0f}", size=10, color=ft.Colors.PURPLE, text_align=ft.TextAlign.CENTER) if forecast['holiday_cost'] > 0 else ft.Text("", size=10, text_align=ft.TextAlign.CENTER),
                             ft.Text(f"Итого: {forecast['income'] - forecast['expenses']:,.0f}", size=10, 
-                                   color=ft.Colors.GREEN if forecast['income'] - forecast['expenses'] > 0 else ft.Colors.RED)
-                        ], expand=2, horizontal_alignment=ft.CrossAxisAlignment.START)
+                                   color=ft.Colors.GREEN if forecast['income'] - forecast['expenses'] > 0 else ft.Colors.RED, text_align=ft.TextAlign.CENTER)
+                        ], expand=2, horizontal_alignment=ft.CrossAxisAlignment.CENTER)
                     ]),
                     bgcolor=ft.Colors.WHITE if i % 2 == 0 else ft.Colors.GREY_50,
                     padding=12,
