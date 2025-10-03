@@ -1,0 +1,58 @@
+{
+  "salary": 50000.0,
+  "current_money": 25000.0,
+  "transactions": [
+    {
+      "type": "expense",
+      "amount": 25000.0,
+      "description": "Оплата квартплаты",
+      "date": "2025-09-30 12:09"
+    }
+  ],
+  "goals": [],
+  "monthly_budget": {},
+  "goal_investments": {},
+  "salary_dates": [
+    8,
+    22
+  ],
+  "rent": 25000.0,
+  "rent_paid_until": "2025-10-10",
+  "safety_reserve": 20000,
+  "chatgpt_enabled": true,
+  "birthdays": [
+    {
+      "name": "Брат",
+      "month": "Апрель",
+      "relationship": "Брат/Сестра",
+      "cost": 3300
+    },
+    {
+      "name": "Лия",
+      "month": "Декабрь",
+      "relationship": "Девушка",
+      "cost": 6600
+    },
+    {
+      "name": "Бабушка",
+      "month": 4,
+      "relationship": "Бабушка",
+      "cost": 3465
+    },
+    {
+      "name": "Мама",
+      "month": 8,
+      "relationship": "Мама",
+      "cost": 3520
+    }
+  ],
+  "notes": [
+    {
+      "title": "Планирую купить",
+      "content": "Что: Видеокарту\nЦена: 20.000\nКогда: Зимой\nЗачем: Обновить ПК",
+      "category": "💡 Идеи",
+      "date": "2025-10-02 21:00",
+      "id": 1
+    }
+  ]
+}
