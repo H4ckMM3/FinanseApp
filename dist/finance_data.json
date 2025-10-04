@@ -1,0 +1,168 @@
+{
+  "salary": 50000.0,
+  "current_money": 25000.0,
+  "transactions": [
+    {
+      "type": "expense",
+      "amount": 25000.0,
+      "description": "Оплата квартплаты",
+      "date": "2025-09-30 12:09"
+    }
+  ],
+  "goals": [],
+  "monthly_budget": {},
+  "goal_investments": {},
+  "salary_dates": [
+    8,
+    22
+  ],
+  "rent": 25000.0,
+  "rent_paid_until": "2025-10-10",
+  "safety_reserve": 20000,
+  "chatgpt_enabled": true,
+  "birthdays": [
+    {
+      "name": "Брат",
+      "month": "Апрель",
+      "relationship": "Брат/Сестра",
+      "cost": 3300
+    },
+    {
+      "name": "Лия",
+      "month": "Декабрь",
+      "relationship": "Девушка",
+      "cost": 6600
+    },
+    {
+      "name": "Бабушка",
+      "month": 4,
+      "relationship": "Бабушка",
+      "cost": 3465
+    },
+    {
+      "name": "Мама",
+      "month": 8,
+      "relationship": "Мама",
+      "cost": 3520
+    }
+  ],
+  "notes": [
+    {
+      "title": "Планирую купить",
+      "content": "Что: Видеокарту\nЦена: 20.000\nКогда: Зимой\nЗачем: Обновить ПК",
+      "category": "💡 Идеи",
+      "date": "2025-10-02 21:00",
+      "id": 1
+    }
+  ],
+  "settings": {
+    "gift_percentage": 0.1,
+    "gift_settings": {
+      "general_percentage": 0.1,
+      "relationship_percentages": {
+        "Семья": 0.15,
+        "Девушка/Парень": 0.2,
+        "Друзья": 0.08,
+        "Коллеги": 0.05,
+        "Дети": 0.12,
+        "Родители": 0.18,
+        "Бабушка/Дедушка": 0.1
+      },
+      "gift_categories": {
+        "Цветы": 0.3,
+        "Косметика": 0.25,
+        "Одежда": 0.2,
+        "Электроника": 0.15,
+        "Книги": 0.1
+      },
+      "max_gift_amount": 10000,
+      "min_gift_amount": 500,
+      "holiday_multiplier": 1.5
+    },
+    "budget_categories": {
+      "Еда": 0.3,
+      "Транспорт": 0.15,
+      "Развлечения": 0.1,
+      "Одежда": 0.1,
+      "Здоровье": 0.1,
+      "Образование": 0.05,
+      "Прочее": 0.2
+    },
+    "safety_reserve_months": 3,
+    "theme": "light",
+    "currency": "RUB",
+    "auto_save": true,
+    "notifications": {
+      "salary_reminder": true,
+      "budget_warning": true,
+      "goal_reminder": true,
+      "birthday_reminder": true
+    },
+    "default_goals": {
+      "emergency_fund": 100000,
+      "vacation_fund": 50000,
+      "investment_fund": 200000
+    },
+    "holiday_settings": {
+      "holidays": {
+        "Новый год": {
+          "enabled": true,
+          "budget": 20000,
+          "multiplier": 2.0
+        },
+        "8 Марта": {
+          "enabled": true,
+          "budget": 5000,
+          "multiplier": 1.5
+        },
+        "23 Февраля": {
+          "enabled": true,
+          "budget": 3000,
+          "multiplier": 1.2
+        },
+        "День Святого Валентина": {
+          "enabled": true,
+          "budget": 8000,
+          "multiplier": 1.8
+        },
+        "Пасха": {
+          "enabled": true,
+          "budget": 2000,
+          "multiplier": 1.0
+        },
+        "День Победы": {
+          "enabled": true,
+          "budget": 1000,
+          "multiplier": 1.0
+        },
+        "День России": {
+          "enabled": true,
+          "budget": 1000,
+          "multiplier": 1.0
+        },
+        "День народного единства": {
+          "enabled": true,
+          "budget": 1000,
+          "multiplier": 1.0
+        }
+      },
+      "special_dates": {
+        "Годовщина отношений": {
+          "enabled": true,
+          "budget": 10000,
+          "multiplier": 1.5
+        },
+        "День свадьбы": {
+          "enabled": true,
+          "budget": 15000,
+          "multiplier": 2.0
+        },
+        "День рождения партнера": {
+          "enabled": true,
+          "budget": 8000,
+          "multiplier": 1.5
+        }
+      }
+    }
+  }
+}

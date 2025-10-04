@@ -1290,6 +1290,66 @@ class MainApp:
                     ], spacing=10),
                     padding=20
                 )
+            ),
+            
+            ft.Card(
+                content=ft.Container(
+                    content=ft.Column([
+                        ft.Text("📊 Визуальная аналитика", size=18, weight=ft.FontWeight.BOLD),
+                        self.create_visual_charts()
+                    ], spacing=10),
+                    padding=20
+                )
+            ),
+            
+            ft.Card(
+                content=ft.Container(
+                    content=ft.Column([
+                        ft.Text("📈 Анализ трендов", size=18, weight=ft.FontWeight.BOLD),
+                        self.create_trend_analysis()
+                    ], spacing=10),
+                    padding=20
+                )
+            ),
+            
+            ft.Card(
+                content=ft.Container(
+                    content=ft.Column([
+                        ft.Text("🔄 Сравнение периодов", size=18, weight=ft.FontWeight.BOLD),
+                        self.create_period_comparison()
+                    ], spacing=10),
+                    padding=20
+                )
+            ),
+            
+            ft.Card(
+                content=ft.Container(
+                    content=ft.Column([
+                        ft.Text("🎯 Детальное отслеживание целей", size=18, weight=ft.FontWeight.BOLD),
+                        self.create_advanced_goal_tracking()
+                    ], spacing=10),
+                    padding=20
+                )
+            ),
+            
+            ft.Card(
+                content=ft.Container(
+                    content=ft.Column([
+                        ft.Text("🔍 Анализ паттернов трат", size=18, weight=ft.FontWeight.BOLD),
+                        self.create_spending_patterns_analysis()
+                    ], spacing=10),
+                    padding=20
+                )
+            ),
+            
+            ft.Card(
+                content=ft.Container(
+                    content=ft.Column([
+                        ft.Text("📤 Экспорт отчетов", size=18, weight=ft.FontWeight.BOLD),
+                        self.create_export_tools()
+                    ], spacing=10),
+                    padding=20
+                )
             )
         ], spacing=20, scroll=ft.ScrollMode.AUTO)
     
@@ -3667,6 +3727,25 @@ class MainApp:
             self.create_smart_recommendations()
         ], spacing=10)
     
+    def get_monthly_expenses(self, month, year):
+        """Получает расходы за конкретный месяц"""
+        transactions = self.finance_app.data["transactions"]
+        monthly_expenses = {}
+        
+        for transaction in transactions:
+            if transaction["type"] == "expense":
+                try:
+                    date = datetime.strptime(transaction["date"], "%Y-%m-%d %H:%M")
+                    if date.month == month and date.year == year:
+                        category = transaction.get("category", "Прочее")
+                        if category not in monthly_expenses:
+                            monthly_expenses[category] = 0
+                        monthly_expenses[category] += transaction["amount"]
+                except:
+                    continue
+        
+        return monthly_expenses
+    
     def calculate_average_monthly_expenses(self):
         transactions = self.finance_app.data["transactions"]
         
@@ -5609,6 +5688,835 @@ class MainApp:
             ft.Text("Множитель применяется к базовому проценту подарков", 
                    size=12, color=ft.Colors.GREY_600)
         ], spacing=10)
+    
+    def create_visual_charts(self):
+        current_month = datetime.now().month
+        current_year = datetime.now().year
+        
+        # Анализ расходов по категориям за текущий месяц
+        monthly_expenses = self.get_monthly_expenses(current_month, current_year)
+        budget_categories = self.finance_app.data["settings"]["budget_categories"]
+        
+        # Создаем визуальные элементы для категорий
+        category_bars = []
+        total_budget = self.finance_app.data["salary"]
+        
+        for category, percentage in budget_categories.items():
+            budget_amount = total_budget * percentage
+            spent_amount = monthly_expenses.get(category, 0) if isinstance(monthly_expenses, dict) else 0
+            spent_percentage = (spent_amount / budget_amount * 100) if budget_amount > 0 else 0
+            
+            color = ft.Colors.GREEN if spent_percentage <= 80 else ft.Colors.ORANGE if spent_percentage <= 100 else ft.Colors.RED
+            
+            category_bars.append(
+                ft.Column([
+                    ft.Row([
+                        ft.Text(f"{category}:", size=12, width=100),
+                        ft.Text(f"{spent_amount:,.0f} / {budget_amount:,.0f} ₽", size=12),
+                        ft.Text(f"{spent_percentage:.1f}%", size=12, color=color)
+                    ]),
+                    ft.ProgressBar(
+                        value=min(spent_percentage / 100, 1.0),
+                        color=color,
+                        bgcolor=ft.Colors.GREY_300,
+                        width=300
+                    )
+                ], spacing=5)
+            )
+        
+        # График доходов и расходов за последние 6 месяцев
+        monthly_data = []
+        for i in range(6):
+            month = current_month - i
+            year = current_year
+            if month <= 0:
+                month += 12
+                year -= 1
+            
+            month_expenses = self.get_monthly_expenses(month, year)
+            month_income = self.finance_app.data["salary"]
+            
+            monthly_data.append({
+                "month": f"{month:02d}.{year}",
+                "income": month_income,
+                "expenses": sum(month_expenses.values()) if month_expenses else 0
+            })
+        
+        monthly_data.reverse()  # От старых к новым
+        
+        # Создаем визуальные элементы для месячных данных
+        monthly_bars = []
+        for data in monthly_data:
+            expenses_percentage = (data["expenses"] / data["income"] * 100) if data["income"] > 0 else 0
+            color = ft.Colors.BLUE if expenses_percentage <= 70 else ft.Colors.ORANGE if expenses_percentage <= 90 else ft.Colors.RED
+            
+            monthly_bars.append(
+                ft.Column([
+                    ft.Text(f"{data['month']}: {data['expenses']:,.0f} / {data['income']:,.0f} ₽", size=10),
+                    ft.ProgressBar(
+                        value=min(expenses_percentage / 100, 1.0),
+                        color=color,
+                        bgcolor=ft.Colors.GREY_300,
+                        width=250
+                    )
+                ], spacing=2)
+            )
+        
+        return ft.Column([
+            ft.Text("Расходы по категориям (текущий месяц):", size=14, weight=ft.FontWeight.BOLD),
+            *category_bars,
+            
+            ft.Divider(),
+            
+            ft.Text("Доходы vs Расходы (последние 6 месяцев):", size=14, weight=ft.FontWeight.BOLD),
+            *monthly_bars,
+            
+            ft.Divider(),
+            
+            ft.Text("Прогресс целей:", size=14, weight=ft.FontWeight.BOLD),
+            self.create_goals_progress_bars()
+        ], spacing=10)
+    
+    def create_goals_progress_bars(self):
+        goals = self.finance_app.data["goals"]
+        goal_investments = self.finance_app.data["goal_investments"]
+        
+        if not goals:
+            return ft.Text("Нет активных целей", size=12, color=ft.Colors.GREY_600)
+        
+        progress_bars = []
+        for goal in goals:
+            goal_name = goal["name"]
+            goal_amount = goal["amount"]
+            invested = goal_investments.get(goal_name, 0)
+            progress = (invested / goal_amount * 100) if goal_amount > 0 else 0
+            
+            color = ft.Colors.GREEN if progress >= 80 else ft.Colors.BLUE if progress >= 50 else ft.Colors.ORANGE
+            
+            progress_bars.append(
+                ft.Column([
+                    ft.Row([
+                        ft.Text(f"{goal_name}:", size=12, width=150),
+                        ft.Text(f"{invested:,.0f} / {goal_amount:,.0f} ₽", size=12),
+                        ft.Text(f"{progress:.1f}%", size=12, color=color)
+                    ]),
+                    ft.ProgressBar(
+                        value=min(progress / 100, 1.0),
+                        color=color,
+                        bgcolor=ft.Colors.GREY_300,
+                        width=300
+                    )
+                ], spacing=5)
+            )
+        
+        return ft.Column(progress_bars, spacing=8)
+    
+    def create_trend_analysis(self):
+        current_month = datetime.now().month
+        current_year = datetime.now().year
+        
+        # Анализ трендов за последние 12 месяцев
+        trends = []
+        for i in range(12):
+            month = current_month - i
+            year = current_year
+            if month <= 0:
+                month += 12
+                year -= 1
+            
+            month_expenses = self.get_monthly_expenses(month, year)
+            total_expenses = sum(month_expenses.values()) if month_expenses else 0
+            month_income = self.finance_app.data["salary"]
+            savings = month_income - total_expenses
+            
+            trends.append({
+                "month": f"{month:02d}.{year}",
+                "income": month_income,
+                "expenses": total_expenses,
+                "savings": savings,
+                "savings_rate": (savings / month_income * 100) if month_income > 0 else 0
+            })
+        
+        trends.reverse()  # От старых к новым
+        
+        # Анализ трендов
+        if len(trends) >= 3:
+            recent_savings = [t["savings"] for t in trends[-3:]]
+            older_savings = [t["savings"] for t in trends[-6:-3]] if len(trends) >= 6 else []
+            
+            recent_avg = sum(recent_savings) / len(recent_savings)
+            older_avg = sum(older_savings) / len(older_savings) if older_savings else recent_avg
+            
+            savings_trend = "📈 Растет" if recent_avg > older_avg else "📉 Падает" if recent_avg < older_avg else "➡️ Стабильно"
+            
+            # Анализ сезонности
+            seasonal_analysis = self.analyze_seasonality(trends)
+            
+            # Прогноз на следующий месяц
+            next_month_forecast = self.forecast_next_month(trends)
+        else:
+            savings_trend = "Недостаточно данных"
+            seasonal_analysis = "Недостаточно данных"
+            next_month_forecast = "Недостаточно данных"
+        
+        return ft.Column([
+            ft.Text("Анализ трендов сбережений:", size=14, weight=ft.FontWeight.BOLD),
+            ft.Text(f"Тренд: {savings_trend}", size=12),
+            
+            ft.Divider(),
+            
+            ft.Text("Сезонный анализ:", size=14, weight=ft.FontWeight.BOLD),
+            ft.Text(seasonal_analysis, size=12),
+            
+            ft.Divider(),
+            
+            ft.Text("Прогноз на следующий месяц:", size=14, weight=ft.FontWeight.BOLD),
+            ft.Text(next_month_forecast, size=12),
+            
+            ft.Divider(),
+            
+            ft.Text("Детальная статистика по месяцам:", size=14, weight=ft.FontWeight.BOLD),
+            self.create_monthly_trends_table(trends[-6:])  # Показываем последние 6 месяцев
+        ], spacing=10)
+    
+    def analyze_seasonality(self, trends):
+        if len(trends) < 6:
+            return "Недостаточно данных для анализа"
+        
+        # Группируем по месяцам года
+        monthly_averages = {}
+        for trend in trends:
+            month = int(trend["month"].split('.')[0])
+            if month not in monthly_averages:
+                monthly_averages[month] = []
+            monthly_averages[month].append(trend["expenses"])
+        
+        # Находим самые дорогие и дешевые месяцы
+        avg_by_month = {}
+        for month, expenses in monthly_averages.items():
+            avg_by_month[month] = sum(expenses) / len(expenses)
+        
+        if not avg_by_month:
+            return "Недостаточно данных"
+        
+        max_month = max(avg_by_month, key=avg_by_month.get)
+        min_month = min(avg_by_month, key=avg_by_month.get)
+        
+        month_names = ["", "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
+                      "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"]
+        
+        return f"Самый дорогой месяц: {month_names[max_month]} ({avg_by_month[max_month]:,.0f} ₽)\nСамый дешевый месяц: {month_names[min_month]} ({avg_by_month[min_month]:,.0f} ₽)"
+    
+    def forecast_next_month(self, trends):
+        if len(trends) < 3:
+            return "Недостаточно данных для прогноза"
+        
+        # Простой прогноз на основе среднего за последние 3 месяца
+        recent_trends = trends[-3:]
+        avg_expenses = sum(t["expenses"] for t in recent_trends) / len(recent_trends)
+        avg_savings = sum(t["savings"] for t in recent_trends) / len(recent_trends)
+        
+        current_income = self.finance_app.data["salary"]
+        forecast_savings = current_income - avg_expenses
+        
+        return f"Прогнозируемые расходы: {avg_expenses:,.0f} ₽\nПрогнозируемые сбережения: {forecast_savings:,.0f} ₽"
+    
+    def create_monthly_trends_table(self, trends):
+        table_rows = []
+        for trend in trends:
+            color = ft.Colors.GREEN if trend["savings"] > 0 else ft.Colors.RED
+            table_rows.append(
+                ft.Row([
+                    ft.Text(trend["month"], size=10, width=60),
+                    ft.Text(f"{trend['income']:,.0f}", size=10, width=80),
+                    ft.Text(f"{trend['expenses']:,.0f}", size=10, width=80),
+                    ft.Text(f"{trend['savings']:,.0f}", size=10, width=80, color=color),
+                    ft.Text(f"{trend['savings_rate']:.1f}%", size=10, width=60, color=color)
+                ])
+            )
+        
+        return ft.Column([
+            ft.Row([
+                ft.Text("Месяц", size=10, weight=ft.FontWeight.BOLD, width=60),
+                ft.Text("Доходы", size=10, weight=ft.FontWeight.BOLD, width=80),
+                ft.Text("Расходы", size=10, weight=ft.FontWeight.BOLD, width=80),
+                ft.Text("Сбережения", size=10, weight=ft.FontWeight.BOLD, width=80),
+                ft.Text("Ставка", size=10, weight=ft.FontWeight.BOLD, width=60)
+            ]),
+            *table_rows
+        ], spacing=2)
+    
+    def create_period_comparison(self):
+        current_month = datetime.now().month
+        current_year = datetime.now().year
+        
+        # Сравниваем текущий месяц с предыдущим
+        current_expenses = self.get_monthly_expenses(current_month, current_year)
+        prev_month = current_month - 1
+        prev_year = current_year
+        if prev_month <= 0:
+            prev_month += 12
+            prev_year -= 1
+        
+        prev_expenses = self.get_monthly_expenses(prev_month, prev_year)
+        
+        current_total = sum(current_expenses.values()) if current_expenses else 0
+        prev_total = sum(prev_expenses.values()) if prev_expenses else 0
+        
+        difference = current_total - prev_total
+        percent_change = (difference / prev_total * 100) if prev_total > 0 else 0
+        
+        # Сравнение по категориям
+        category_comparison = []
+        all_categories = set(current_expenses.keys()) | set(prev_expenses.keys())
+        
+        for category in all_categories:
+            current_amount = current_expenses.get(category, 0)
+            prev_amount = prev_expenses.get(category, 0)
+            cat_difference = current_amount - prev_amount
+            cat_percent = (cat_difference / prev_amount * 100) if prev_amount > 0 else 0
+            
+            color = ft.Colors.RED if cat_difference > 0 else ft.Colors.GREEN if cat_difference < 0 else ft.Colors.GREY
+            symbol = "📈" if cat_difference > 0 else "📉" if cat_difference < 0 else "➡️"
+            
+            category_comparison.append(
+                ft.Row([
+                    ft.Text(f"{category}:", size=12, width=120),
+                    ft.Text(f"{current_amount:,.0f} ₽", size=12, width=80),
+                    ft.Text(f"{prev_amount:,.0f} ₽", size=12, width=80),
+                    ft.Text(f"{symbol} {cat_difference:+,.0f} ₽", size=12, width=100, color=color),
+                    ft.Text(f"{cat_percent:+.1f}%", size=12, width=60, color=color)
+                ])
+            )
+        
+        return ft.Column([
+            ft.Text("Сравнение с предыдущим месяцем:", size=14, weight=ft.FontWeight.BOLD),
+            ft.Row([
+                ft.Text(f"Текущий месяц: {current_total:,.0f} ₽", size=12),
+                ft.Text(f"Предыдущий: {prev_total:,.0f} ₽", size=12),
+                ft.Text(f"Изменение: {difference:+,.0f} ₽ ({percent_change:+.1f}%)", 
+                       size=12, color=ft.Colors.RED if difference > 0 else ft.Colors.GREEN)
+            ]),
+            
+            ft.Divider(),
+            
+            ft.Text("Детальное сравнение по категориям:", size=14, weight=ft.FontWeight.BOLD),
+            ft.Row([
+                ft.Text("Категория", size=10, weight=ft.FontWeight.BOLD, width=120),
+                ft.Text("Текущий", size=10, weight=ft.FontWeight.BOLD, width=80),
+                ft.Text("Предыдущий", size=10, weight=ft.FontWeight.BOLD, width=80),
+                ft.Text("Изменение", size=10, weight=ft.FontWeight.BOLD, width=100),
+                ft.Text("%", size=10, weight=ft.FontWeight.BOLD, width=60)
+            ]),
+            *category_comparison
+        ], spacing=8)
+    
+    def create_advanced_goal_tracking(self):
+        goals = self.finance_app.data["goals"]
+        goal_investments = self.finance_app.data["goal_investments"]
+        
+        if not goals:
+            return ft.Text("Нет активных целей для отслеживания", size=12, color=ft.Colors.GREY_600)
+        
+        goal_details = []
+        for goal in goals:
+            goal_name = goal["name"]
+            goal_amount = goal["amount"]
+            goal_date = goal.get("date", "Не указана")
+            invested = goal_investments.get(goal_name, 0)
+            remaining = goal_amount - invested
+            progress = (invested / goal_amount * 100) if goal_amount > 0 else 0
+            
+            # Расчет времени до достижения цели
+            monthly_savings = self.calculate_monthly_savings()
+            months_needed = (remaining / monthly_savings) if monthly_savings > 0 else float('inf')
+            
+            # Анализ влияния покупок на цели
+            impact_analysis = self.analyze_goal_impact(goal_name, goal_amount, invested)
+            
+            color = ft.Colors.GREEN if progress >= 80 else ft.Colors.BLUE if progress >= 50 else ft.Colors.ORANGE
+            
+            goal_details.append(
+                ft.Card(
+                    content=ft.Container(
+                        content=ft.Column([
+                            ft.Text(f"🎯 {goal_name}", size=16, weight=ft.FontWeight.BOLD),
+                            ft.Text(f"Цель: {goal_amount:,.0f} ₽ | Накоплено: {invested:,.0f} ₽ ({progress:.1f}%)", size=12),
+                            ft.Text(f"Осталось: {remaining:,.0f} ₽", size=12, color=color),
+                            ft.Text(f"Срок достижения: {months_needed:.1f} месяцев" if months_needed != float('inf') else "Недостижимо при текущих сбережениях", size=12),
+                            ft.ProgressBar(
+                                value=min(progress / 100, 1.0),
+                                color=color,
+                                bgcolor=ft.Colors.GREY_300,
+                                width=300
+                            ),
+                            ft.Text(impact_analysis, size=10, color=ft.Colors.GREY_600)
+                        ], spacing=5),
+                        padding=10
+                    )
+                )
+            )
+        
+        return ft.Column([
+            ft.Text("Детальное отслеживание целей:", size=14, weight=ft.FontWeight.BOLD),
+            *goal_details,
+            
+            ft.Divider(),
+            
+            ft.Text("Рекомендации по ускорению достижения целей:", size=14, weight=ft.FontWeight.BOLD),
+            self.create_goal_acceleration_tips()
+        ], spacing=10)
+    
+    def calculate_monthly_savings(self):
+        salary = self.finance_app.data["salary"]
+        current_month = datetime.now().month
+        current_year = datetime.now().year
+        monthly_expenses = self.get_monthly_expenses(current_month, current_year)
+        total_expenses = sum(monthly_expenses.values()) if monthly_expenses else 0
+        return salary - total_expenses
+    
+    def analyze_goal_impact(self, goal_name, goal_amount, invested):
+        remaining = goal_amount - invested
+        monthly_savings = self.calculate_monthly_savings()
+        
+        if monthly_savings <= 0:
+            return "⚠️ Отрицательные сбережения - цель недостижима"
+        
+        months_needed = remaining / monthly_savings
+        
+        if months_needed <= 1:
+            return "🎉 Цель будет достигнута в следующем месяце!"
+        elif months_needed <= 3:
+            return f"✅ Цель достижима за {months_needed:.1f} месяцев"
+        elif months_needed <= 12:
+            return f"⚠️ Цель достижима за {months_needed:.1f} месяцев - рассмотрите увеличение сбережений"
+        else:
+            return f"❌ Цель недостижима за разумный срок ({months_needed:.1f} месяцев)"
+    
+    def create_goal_acceleration_tips(self):
+        monthly_savings = self.calculate_monthly_savings()
+        salary = self.finance_app.data["salary"]
+        
+        tips = []
+        
+        if monthly_savings < salary * 0.1:
+            tips.append("💡 Увеличьте сбережения до 10% от зарплаты")
+        
+        if monthly_savings < salary * 0.2:
+            tips.append("💡 Рассмотрите возможность сбережения 20% от зарплаты")
+        
+        # Анализ категорий расходов для оптимизации
+        current_month = datetime.now().month
+        current_year = datetime.now().year
+        monthly_expenses = self.get_monthly_expenses(current_month, current_year)
+        budget_categories = self.finance_app.data["settings"]["budget_categories"]
+        
+        for category, percentage in budget_categories.items():
+            budget_amount = salary * percentage
+            spent_amount = monthly_expenses.get(category, 0) if isinstance(monthly_expenses, dict) else 0
+            if spent_amount > budget_amount * 1.1:  # Превышение на 10%
+                tips.append(f"💡 Сократите расходы на {category} (превышение бюджета)")
+        
+        if not tips:
+            tips.append("✅ Отличная работа! Ваши сбережения оптимальны")
+        
+        return ft.Column([ft.Text(tip, size=12) for tip in tips], spacing=5)
+    
+    def create_spending_patterns_analysis(self):
+        # Анализ паттернов трат за последние 3 месяца
+        current_month = datetime.now().month
+        current_year = datetime.now().year
+        
+        patterns = []
+        for i in range(3):
+            month = current_month - i
+            year = current_year
+            if month <= 0:
+                month += 12
+                year -= 1
+            
+            month_expenses = self.get_monthly_expenses(month, year)
+            if month_expenses:
+                patterns.append(month_expenses)
+        
+        if not patterns:
+            return ft.Text("Недостаточно данных для анализа паттернов", size=12, color=ft.Colors.GREY_600)
+        
+        # Анализ дней недели (если есть данные о датах транзакций)
+        weekday_analysis = self.analyze_weekday_spending()
+        
+        # Анализ импульсивных покупок
+        impulse_analysis = self.analyze_impulse_purchases()
+        
+        # Анализ "дыр в бюджете"
+        budget_holes = self.find_budget_holes(patterns)
+        
+        return ft.Column([
+            ft.Text("Анализ дней недели:", size=14, weight=ft.FontWeight.BOLD),
+            weekday_analysis,
+            
+            ft.Divider(),
+            
+            ft.Text("Анализ импульсивных покупок:", size=14, weight=ft.FontWeight.BOLD),
+            impulse_analysis,
+            
+            ft.Divider(),
+            
+            ft.Text("Скрытые расходы:", size=14, weight=ft.FontWeight.BOLD),
+            budget_holes
+        ], spacing=10)
+    
+    def analyze_weekday_spending(self):
+        # Простой анализ на основе имеющихся данных
+        transactions = self.finance_app.data["transactions"]
+        
+        if not transactions:
+            return ft.Text("Нет данных о транзакциях", size=12, color=ft.Colors.GREY_600)
+        
+        # Группируем по дням недели (упрощенный анализ)
+        weekday_totals = {}
+        for transaction in transactions:
+            try:
+                date = datetime.strptime(transaction["date"], "%Y-%m-%d %H:%M")
+                weekday = date.strftime("%A")
+                amount = transaction["amount"]
+                
+                if weekday not in weekday_totals:
+                    weekday_totals[weekday] = 0
+                weekday_totals[weekday] += amount
+            except:
+                continue
+        
+        if not weekday_totals:
+            return ft.Text("Не удалось проанализировать дни недели", size=12, color=ft.Colors.GREY_600)
+        
+        # Находим самый дорогой день
+        max_day = max(weekday_totals, key=weekday_totals.get)
+        min_day = min(weekday_totals, key=weekday_totals.get)
+        
+        weekday_names = {
+            "Monday": "Понедельник", "Tuesday": "Вторник", "Wednesday": "Среда",
+            "Thursday": "Четверг", "Friday": "Пятница", "Saturday": "Суббота", "Sunday": "Воскресенье"
+        }
+        
+        return ft.Column([
+            ft.Text(f"Самый дорогой день: {weekday_names.get(max_day, max_day)} ({weekday_totals[max_day]:,.0f} ₽)", size=12),
+            ft.Text(f"Самый дешевый день: {weekday_names.get(min_day, min_day)} ({weekday_totals[min_day]:,.0f} ₽)", size=12)
+        ], spacing=5)
+    
+    def analyze_impulse_purchases(self):
+        # Анализ транзакций на предмет импульсивных покупок
+        transactions = self.finance_app.data["transactions"]
+        
+        impulse_indicators = []
+        total_impulse = 0
+        
+        for transaction in transactions:
+            if transaction["type"] == "expense":
+                amount = transaction["amount"]
+                description = transaction["description"].lower()
+                
+                # Простые индикаторы импульсивных покупок
+                if any(word in description for word in ["импульс", "спонтан", "внезапно", "быстро"]):
+                    impulse_indicators.append(f"• {transaction['description']}: {amount:,.0f} ₽")
+                    total_impulse += amount
+                elif amount > 5000 and any(word in description for word in ["подарок", "сюрприз", "неожиданно"]):
+                    impulse_indicators.append(f"• {transaction['description']}: {amount:,.0f} ₽")
+                    total_impulse += amount
+        
+        if not impulse_indicators:
+            return ft.Text("✅ Импульсивных покупок не обнаружено", size=12, color=ft.Colors.GREEN)
+        
+        return ft.Column([
+            ft.Text(f"Обнаружено импульсивных покупок на сумму: {total_impulse:,.0f} ₽", size=12, color=ft.Colors.ORANGE),
+            *[ft.Text(indicator, size=10) for indicator in impulse_indicators[:5]]  # Показываем первые 5
+        ], spacing=5)
+    
+    def find_budget_holes(self, patterns):
+        # Поиск скрытых расходов, которые не учтены в бюджете
+        budget_categories = self.finance_app.data["settings"]["budget_categories"]
+        salary = self.finance_app.data["salary"]
+        
+        holes = []
+        
+        # Анализируем последний месяц
+        if patterns:
+            last_month = patterns[0]
+            total_budget = salary
+            total_spent = sum(last_month.values())
+            
+            # Проверяем, есть ли расходы, превышающие бюджет
+            for category, spent in last_month.items():
+                if category in budget_categories:
+                    budget_percentage = budget_categories[category]
+                    budget_amount = total_budget * budget_percentage
+                    
+                    if spent > budget_amount * 1.2:  # Превышение на 20%
+                        holes.append(f"• {category}: потрачено {spent:,.0f} ₽, бюджет {budget_amount:,.0f} ₽")
+        
+        if not holes:
+            return ft.Text("✅ Скрытых расходов не обнаружено", size=12, color=ft.Colors.GREEN)
+        
+        return ft.Column([
+            ft.Text("Обнаружены скрытые расходы:", size=12, color=ft.Colors.RED),
+            *[ft.Text(hole, size=10) for hole in holes]
+        ], spacing=5)
+    
+    def create_export_tools(self):
+        return ft.Column([
+            ft.Text("Экспорт отчетов:", size=14, weight=ft.FontWeight.BOLD),
+            
+            ft.Row([
+                ft.ElevatedButton(
+                    "📊 Экспорт в CSV",
+                    on_click=self.export_to_csv,
+                    bgcolor=ft.Colors.BLUE,
+                    color=ft.Colors.WHITE
+                ),
+                ft.ElevatedButton(
+                    "📋 Создать отчет",
+                    on_click=self.create_financial_report,
+                    bgcolor=ft.Colors.GREEN,
+                    color=ft.Colors.WHITE
+                )
+            ], spacing=10),
+            
+            ft.Divider(),
+            
+            ft.Text("Быстрые отчеты:", size=14, weight=ft.FontWeight.BOLD),
+            
+            ft.Row([
+                ft.ElevatedButton(
+                    "📅 Месячный отчет",
+                    on_click=lambda e: self.quick_report("monthly"),
+                    bgcolor=ft.Colors.ORANGE,
+                    color=ft.Colors.WHITE
+                ),
+                ft.ElevatedButton(
+                    "🎯 Отчет по целям",
+                    on_click=lambda e: self.quick_report("goals"),
+                    bgcolor=ft.Colors.PURPLE,
+                    color=ft.Colors.WHITE
+                )
+            ], spacing=10),
+            
+            ft.Text("Отчеты сохраняются в папке 'reports'", size=12, color=ft.Colors.GREY_600)
+        ], spacing=10)
+    
+    def export_to_csv(self, e):
+        try:
+            import csv
+            import os
+            
+            # Создаем папку для отчетов
+            os.makedirs("reports", exist_ok=True)
+            
+            # Экспортируем транзакции
+            with open("reports/transactions.csv", "w", newline="", encoding="utf-8") as f:
+                writer = csv.writer(f)
+                writer.writerow(["Дата", "Тип", "Сумма", "Описание"])
+                
+                for transaction in self.finance_app.data["transactions"]:
+                    writer.writerow([
+                        transaction["date"],
+                        transaction["type"],
+                        transaction["amount"],
+                        transaction["description"]
+                    ])
+            
+            # Показываем уведомление
+            self.page.snack_bar = ft.SnackBar(
+                content=ft.Text("✅ Данные экспортированы в reports/transactions.csv"),
+                bgcolor=ft.Colors.GREEN
+            )
+            self.page.snack_bar.open = True
+            self.page.update()
+            
+        except Exception as ex:
+            self.page.snack_bar = ft.SnackBar(
+                content=ft.Text(f"❌ Ошибка экспорта: {str(ex)}"),
+                bgcolor=ft.Colors.RED
+            )
+            self.page.snack_bar.open = True
+            self.page.update()
+    
+    def create_financial_report(self, e):
+        try:
+            import os
+            
+            os.makedirs("reports", exist_ok=True)
+            
+            # Создаем текстовый отчет
+            report_content = self.generate_financial_report()
+            
+            with open("reports/financial_report.txt", "w", encoding="utf-8") as f:
+                f.write(report_content)
+            
+            self.page.snack_bar = ft.SnackBar(
+                content=ft.Text("✅ Финансовый отчет создан: reports/financial_report.txt"),
+                bgcolor=ft.Colors.GREEN
+            )
+            self.page.snack_bar.open = True
+            self.page.update()
+            
+        except Exception as ex:
+            self.page.snack_bar = ft.SnackBar(
+                content=ft.Text(f"❌ Ошибка создания отчета: {str(ex)}"),
+                bgcolor=ft.Colors.RED
+            )
+            self.page.snack_bar.open = True
+            self.page.update()
+    
+    def generate_financial_report(self):
+        current_money = self.finance_app.data["current_money"]
+        salary = self.finance_app.data["salary"]
+        goals = self.finance_app.data["goals"]
+        goal_investments = self.finance_app.data["goal_investments"]
+        
+        report = f"""
+ФИНАНСОВЫЙ ОТЧЕТ
+================
+Дата создания: {datetime.now().strftime("%d.%m.%Y %H:%M")}
+
+ОБЩАЯ ИНФОРМАЦИЯ
+================
+Текущий баланс: {current_money:,.0f} ₽
+Зарплата: {salary:,.0f} ₽/месяц
+
+ЦЕЛИ
+====
+"""
+        
+        if goals:
+            for goal in goals:
+                goal_name = goal["name"]
+                goal_amount = goal["amount"]
+                invested = goal_investments.get(goal_name, 0)
+                progress = (invested / goal_amount * 100) if goal_amount > 0 else 0
+                
+                report += f"""
+{goal_name}:
+  Цель: {goal_amount:,.0f} ₽
+  Накоплено: {invested:,.0f} ₽ ({progress:.1f}%)
+  Осталось: {goal_amount - invested:,.0f} ₽
+"""
+        else:
+            report += "Активных целей нет\n"
+        
+        report += f"""
+ТРАНЗАКЦИИ (последние 10)
+========================
+"""
+        
+        recent_transactions = self.finance_app.data["transactions"][-10:]
+        for transaction in recent_transactions:
+            report += f"{transaction['date']} | {transaction['type']} | {transaction['amount']:,.0f} ₽ | {transaction['description']}\n"
+        
+        return report
+    
+    def quick_report(self, report_type):
+        try:
+            import os
+            
+            os.makedirs("reports", exist_ok=True)
+            
+            filename = ""
+            content = ""
+            
+            if report_type == "monthly":
+                filename = f"reports/monthly_report_{datetime.now().strftime('%Y%m')}.txt"
+                content = self.generate_monthly_report()
+            elif report_type == "goals":
+                filename = f"reports/goals_report_{datetime.now().strftime('%Y%m%d')}.txt"
+                content = self.generate_goals_report()
+            
+            if filename and content:
+                with open(filename, "w", encoding="utf-8") as f:
+                    f.write(content)
+            
+            self.page.snack_bar = ft.SnackBar(
+                content=ft.Text(f"✅ Отчет создан: {filename}"),
+                bgcolor=ft.Colors.GREEN
+            )
+            self.page.snack_bar.open = True
+            self.page.update()
+            
+        except Exception as ex:
+            self.page.snack_bar = ft.SnackBar(
+                content=ft.Text(f"❌ Ошибка: {str(ex)}"),
+                bgcolor=ft.Colors.RED
+            )
+            self.page.snack_bar.open = True
+            self.page.update()
+    
+    def generate_monthly_report(self):
+        current_month = datetime.now().month
+        current_year = datetime.now().year
+        
+        monthly_expenses = self.get_monthly_expenses(current_month, current_year)
+        total_expenses = sum(monthly_expenses.values()) if monthly_expenses else 0
+        salary = self.finance_app.data["salary"]
+        savings = salary - total_expenses
+        
+        return f"""
+МЕСЯЧНЫЙ ОТЧЕТ - {current_month:02d}.{current_year}
+==============================================
+
+ДОХОДЫ
+======
+Зарплата: {salary:,.0f} ₽
+
+РАСХОДЫ ПО КАТЕГОРИЯМ
+====================
+"""
+        
+        for category, amount in monthly_expenses.items():
+            percentage = (amount / salary * 100) if salary > 0 else 0
+            report += f"{category}: {amount:,.0f} ₽ ({percentage:.1f}%)\n"
+        
+        report += f"""
+ИТОГО
+=====
+Общие расходы: {total_expenses:,.0f} ₽
+Сбережения: {savings:,.0f} ₽
+Ставка сбережений: {(savings/salary*100):.1f}%
+"""
+        
+        return report
+    
+    def generate_goals_report(self):
+        goals = self.finance_app.data["goals"]
+        goal_investments = self.finance_app.data["goal_investments"]
+        
+        report = f"""
+ОТЧЕТ ПО ЦЕЛЯМ - {datetime.now().strftime('%d.%m.%Y')}
+==============================================
+
+"""
+        
+        if not goals:
+            return report + "Активных целей нет"
+        
+        for goal in goals:
+            goal_name = goal["name"]
+            goal_amount = goal["amount"]
+            goal_date = goal.get("date", "Не указана")
+            invested = goal_investments.get(goal_name, 0)
+            remaining = goal_amount - invested
+            progress = (invested / goal_amount * 100) if goal_amount > 0 else 0
+            
+            report += f"""
+ЦЕЛЬ: {goal_name}
+================
+Сумма цели: {goal_amount:,.0f} ₽
+Накоплено: {invested:,.0f} ₽
+Осталось: {remaining:,.0f} ₽
+Прогресс: {progress:.1f}%
+Планируемая дата: {goal_date}
+
+"""
+        
+        return report
     
     def get_salary_status(self):
         current_day = datetime.now().day
