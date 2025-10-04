@@ -29,6 +29,56 @@ class FinanceApp:
                     self.data["birthdays"] = []
                 if "notes" not in self.data:
                     self.data["notes"] = []
+                if "settings" not in self.data:
+                    self.data["settings"] = {
+                        "gift_percentage": 0.1,
+                        "gift_settings": {
+                            "general_percentage": 0.1,
+                            "relationship_percentages": {
+                                "Семья": 0.15,
+                                "Девушка/Парень": 0.2,
+                                "Друзья": 0.08,
+                                "Коллеги": 0.05,
+                                "Дети": 0.12,
+                                "Родители": 0.18,
+                                "Бабушка/Дедушка": 0.1
+                            },
+                            "gift_categories": {
+                                "Цветы": 0.3,
+                                "Косметика": 0.25,
+                                "Одежда": 0.2,
+                                "Электроника": 0.15,
+                                "Книги": 0.1
+                            },
+                            "max_gift_amount": 10000,
+                            "min_gift_amount": 500,
+                            "holiday_multiplier": 1.5
+                        },
+                        "budget_categories": {
+                            "Еда": 0.3,
+                            "Транспорт": 0.15,
+                            "Развлечения": 0.1,
+                            "Одежда": 0.1,
+                            "Здоровье": 0.1,
+                            "Образование": 0.05,
+                            "Прочее": 0.2
+                        },
+                        "safety_reserve_months": 3,
+                        "theme": "light",
+                        "currency": "RUB",
+                        "auto_save": True,
+                        "notifications": {
+                            "salary_reminder": True,
+                            "budget_warning": True,
+                            "goal_reminder": True,
+                            "birthday_reminder": True
+                        },
+                        "default_goals": {
+                            "emergency_fund": 100000,
+                            "vacation_fund": 50000,
+                            "investment_fund": 200000
+                        }
+                    }
         else:
             self.data = {
                 "salary": 0,
@@ -43,7 +93,56 @@ class FinanceApp:
                 "safety_reserve": 20000,
                 "chatgpt_enabled": True,
                 "birthdays": [],
-                "notes": []
+                "notes": [],
+                "settings": {
+                    "gift_percentage": 0.1,
+                    "gift_settings": {
+                        "general_percentage": 0.1,
+                        "relationship_percentages": {
+                            "Семья": 0.15,
+                            "Девушка/Парень": 0.2,
+                            "Друзья": 0.08,
+                            "Коллеги": 0.05,
+                            "Дети": 0.12,
+                            "Родители": 0.18,
+                            "Бабушка/Дедушка": 0.1
+                        },
+                        "gift_categories": {
+                            "Цветы": 0.3,
+                            "Косметика": 0.25,
+                            "Одежда": 0.2,
+                            "Электроника": 0.15,
+                            "Книги": 0.1
+                        },
+                        "max_gift_amount": 10000,
+                        "min_gift_amount": 500,
+                        "holiday_multiplier": 1.5
+                    },
+                    "budget_categories": {
+                        "Еда": 0.3,
+                        "Транспорт": 0.15,
+                        "Развлечения": 0.1,
+                        "Одежда": 0.1,
+                        "Здоровье": 0.1,
+                        "Образование": 0.05,
+                        "Прочее": 0.2
+                    },
+                    "safety_reserve_months": 3,
+                    "theme": "light",
+                    "currency": "RUB",
+                    "auto_save": True,
+                    "notifications": {
+                        "salary_reminder": True,
+                        "budget_warning": True,
+                        "goal_reminder": True,
+                        "birthday_reminder": True
+                    },
+                    "default_goals": {
+                        "emergency_fund": 100000,
+                        "vacation_fund": 50000,
+                        "investment_fund": 200000
+                    }
+                }
             }
     
     def save_data(self):
@@ -77,6 +176,7 @@ class MainApp:
                 ft.NavigationBarDestination(icon=ft.Icons.TRENDING_UP, label="Прогноз"),
                 ft.NavigationBarDestination(icon=ft.Icons.CALCULATE, label="Калькулятор"),
                 ft.NavigationBarDestination(icon=ft.Icons.NOTE, label="Заметки"),
+                ft.NavigationBarDestination(icon=ft.Icons.SETTINGS, label="Настройки"),
             ],
             on_change=self.on_navigation_change
         )
@@ -110,6 +210,8 @@ class MainApp:
             self.main_content.content = self.create_calculator_page()
         elif selected_index == 6:
             self.main_content.content = self.create_notes_page()
+        elif selected_index == 7:
+            self.main_content.content = self.create_settings_page()
         
         self.page.update()
     
@@ -4917,6 +5019,596 @@ class MainApp:
                 )
             )
         ], spacing=20, scroll=ft.ScrollMode.AUTO)
+    
+    def create_settings_page(self):
+        return ft.Column([
+            ft.Text("⚙️ Настройки", size=24, weight=ft.FontWeight.BOLD),
+            ft.Divider(),
+            
+            ft.Card(
+                content=ft.Container(
+                    content=ft.Column([
+                        ft.Text("🎁 Настройки подарков", size=18, weight=ft.FontWeight.BOLD),
+                        self.create_gift_settings()
+                    ], spacing=10),
+                    padding=20
+                )
+            ),
+            
+            ft.Card(
+                content=ft.Container(
+                    content=ft.Column([
+                        ft.Text("💰 Настройки бюджета", size=18, weight=ft.FontWeight.BOLD),
+                        self.create_budget_settings()
+                    ], spacing=10),
+                    padding=20
+                )
+            ),
+            
+            ft.Card(
+                content=ft.Container(
+                    content=ft.Column([
+                        ft.Text("🏠 Настройки жилья", size=18, weight=ft.FontWeight.BOLD),
+                        self.create_housing_settings()
+                    ], spacing=10),
+                    padding=20
+                )
+            ),
+            
+            ft.Card(
+                content=ft.Container(
+                    content=ft.Column([
+                        ft.Text("💼 Настройки зарплаты", size=18, weight=ft.FontWeight.BOLD),
+                        self.create_salary_settings()
+                    ], spacing=10),
+                    padding=20
+                )
+            ),
+            
+            ft.Card(
+                content=ft.Container(
+                    content=ft.Column([
+                        ft.Text("🎨 Внешний вид", size=18, weight=ft.FontWeight.BOLD),
+                        self.create_appearance_settings()
+                    ], spacing=10),
+                    padding=20
+                )
+            ),
+            
+            ft.Card(
+                content=ft.Container(
+                    content=ft.Column([
+                        ft.Text("🔔 Уведомления", size=18, weight=ft.FontWeight.BOLD),
+                        self.create_notification_settings()
+                    ], spacing=10),
+                    padding=20
+                )
+            ),
+            
+            ft.Card(
+                content=ft.Container(
+                    content=ft.Column([
+                        ft.Text("🎉 Настройки праздников", size=18, weight=ft.FontWeight.BOLD),
+                        self.create_holiday_settings()
+                    ], spacing=10),
+                    padding=20
+                )
+            )
+        ], spacing=20, scroll=ft.ScrollMode.AUTO)
+    
+    def create_gift_settings(self):
+        gift_settings = self.finance_app.data["settings"]["gift_settings"]
+        
+        def update_general_percentage(e):
+            try:
+                new_value = float(e.control.value) / 100
+                self.finance_app.data["settings"]["gift_settings"]["general_percentage"] = new_value
+                self.finance_app.save_data()
+                self.page.update()
+            except:
+                pass
+        
+        def update_relationship_percentage(relationship, value):
+            try:
+                new_value = float(value) / 100
+                self.finance_app.data["settings"]["gift_settings"]["relationship_percentages"][relationship] = new_value
+                self.finance_app.save_data()
+                self.page.update()
+            except:
+                pass
+        
+        def update_gift_category_percentage(category, value):
+            try:
+                new_value = float(value) / 100
+                self.finance_app.data["settings"]["gift_settings"]["gift_categories"][category] = new_value
+                self.finance_app.save_data()
+                self.page.update()
+            except:
+                pass
+        
+        def update_max_gift_amount(e):
+            try:
+                new_value = float(e.control.value)
+                self.finance_app.data["settings"]["gift_settings"]["max_gift_amount"] = new_value
+                self.finance_app.save_data()
+                self.page.update()
+            except:
+                pass
+        
+        def update_min_gift_amount(e):
+            try:
+                new_value = float(e.control.value)
+                self.finance_app.data["settings"]["gift_settings"]["min_gift_amount"] = new_value
+                self.finance_app.save_data()
+                self.page.update()
+            except:
+                pass
+        
+        def update_holiday_multiplier(e):
+            try:
+                new_value = float(e.control.value)
+                self.finance_app.data["settings"]["gift_settings"]["holiday_multiplier"] = new_value
+                self.finance_app.save_data()
+                self.page.update()
+            except:
+                pass
+        
+        relationship_controls = []
+        for relationship, percentage in gift_settings["relationship_percentages"].items():
+            relationship_controls.append(
+                ft.Row([
+                    ft.Text(f"{relationship}:", size=12, width=120),
+                    ft.Slider(
+                        min=0,
+                        max=50,
+                        value=percentage*100,
+                        divisions=50,
+                        width=150,
+                        on_change=lambda e, rel=relationship: update_relationship_percentage(rel, e.control.value)
+                    ),
+                    ft.Text(f"{percentage*100:.1f}%", size=12, width=60)
+                ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN)
+            )
+        
+        category_controls = []
+        for category, percentage in gift_settings["gift_categories"].items():
+            category_controls.append(
+                ft.Row([
+                    ft.Text(f"{category}:", size=12, width=120),
+                    ft.Slider(
+                        min=0,
+                        max=100,
+                        value=percentage*100,
+                        divisions=100,
+                        width=150,
+                        on_change=lambda e, cat=category: update_gift_category_percentage(cat, e.control.value)
+                    ),
+                    ft.Text(f"{percentage*100:.1f}%", size=12, width=60)
+                ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN)
+            )
+        
+        return ft.Column([
+            ft.Text("Общий процент от зарплаты на подарки:", size=14, weight=ft.FontWeight.BOLD),
+            ft.Slider(
+                min=0,
+                max=50,
+                value=gift_settings["general_percentage"]*100,
+                divisions=50,
+                label="Общий процент",
+                on_change=update_general_percentage
+            ),
+            ft.Text(f"Текущий общий процент: {gift_settings['general_percentage']*100:.1f}%", 
+                   size=12, color=ft.Colors.GREY_600),
+            
+            ft.Divider(),
+            
+            ft.Text("Проценты по типам отношений:", size=14, weight=ft.FontWeight.BOLD),
+            *relationship_controls,
+            
+            ft.Divider(),
+            
+            ft.Text("Распределение бюджета по категориям подарков:", size=14, weight=ft.FontWeight.BOLD),
+            *category_controls,
+            
+            ft.Divider(),
+            
+            ft.Text("Лимиты на подарки:", size=14, weight=ft.FontWeight.BOLD),
+            ft.Row([
+                ft.Column([
+                    ft.Text("Максимальная сумма подарка:", size=12),
+                    ft.TextField(
+                        value=str(gift_settings["max_gift_amount"]),
+                        label="Макс. сумма (₽)",
+                        on_change=update_max_gift_amount,
+                        width=150
+                    )
+                ]),
+                ft.Column([
+                    ft.Text("Минимальная сумма подарка:", size=12),
+                    ft.TextField(
+                        value=str(gift_settings["min_gift_amount"]),
+                        label="Мин. сумма (₽)",
+                        on_change=update_min_gift_amount,
+                        width=150
+                    )
+                ])
+            ]),
+            
+            ft.Divider(),
+            
+            ft.Text("Множитель для праздников:", size=14, weight=ft.FontWeight.BOLD),
+            ft.Slider(
+                min=1.0,
+                max=3.0,
+                value=gift_settings["holiday_multiplier"],
+                divisions=20,
+                label="Множитель",
+                on_change=update_holiday_multiplier
+            ),
+            ft.Text(f"Текущий множитель: {gift_settings['holiday_multiplier']:.1f}x", 
+                   size=12, color=ft.Colors.GREY_600),
+            ft.Text("Применяется к подаркам на праздники (Новый год, 8 марта и т.д.)", 
+                   size=12, color=ft.Colors.GREY_600)
+        ], spacing=10)
+    
+    def create_budget_settings(self):
+        budget_categories = self.finance_app.data["settings"]["budget_categories"]
+        
+        def update_category_percentage(category, value):
+            try:
+                new_value = float(value) / 100
+                self.finance_app.data["settings"]["budget_categories"][category] = new_value
+                self.finance_app.save_data()
+                self.page.update()
+            except:
+                pass
+        
+        category_controls = []
+        for category, percentage in budget_categories.items():
+            category_controls.append(
+                ft.Row([
+                    ft.Text(f"{category}:", size=14, width=120),
+                    ft.Slider(
+                        min=0,
+                        max=100,
+                        value=percentage*100,
+                        divisions=100,
+                        width=200,
+                        on_change=lambda e, cat=category: update_category_percentage(cat, e.control.value)
+                    ),
+                    ft.Text(f"{percentage*100:.1f}%", size=14, width=60)
+                ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN)
+            )
+        
+        return ft.Column([
+            ft.Text("Распределение бюджета по категориям:", size=14),
+            ft.Divider(),
+            *category_controls,
+            ft.Text("Сумма всех процентов должна быть 100%", 
+                   size=12, color=ft.Colors.GREY_600)
+        ], spacing=10)
+    
+    def create_housing_settings(self):
+        safety_reserve_months = self.finance_app.data["settings"]["safety_reserve_months"]
+        
+        def update_safety_reserve(e):
+            try:
+                new_value = int(e.control.value)
+                self.finance_app.data["settings"]["safety_reserve_months"] = new_value
+                self.finance_app.data["safety_reserve"] = new_value * (self.finance_app.data["salary"] / 2)
+                self.finance_app.save_data()
+                self.page.update()
+            except:
+                pass
+        
+        return ft.Column([
+            ft.Text(f"Резервный фонд (месяцев): {safety_reserve_months}", size=14),
+            ft.Slider(
+                min=1,
+                max=12,
+                value=safety_reserve_months,
+                divisions=11,
+                label="Месяцев",
+                on_change=update_safety_reserve
+            ),
+            ft.Text(f"Размер резерва: {safety_reserve_months * (self.finance_app.data['salary'] / 2):,.0f} ₽", 
+                   size=12, color=ft.Colors.GREY_600)
+        ], spacing=10)
+    
+    def create_salary_settings(self):
+        salary = self.finance_app.data["salary"]
+        salary_dates = self.finance_app.data["salary_dates"]
+        
+        def update_salary(e):
+            try:
+                new_value = float(e.control.value)
+                self.finance_app.data["salary"] = new_value
+                self.finance_app.save_data()
+                self.page.update()
+            except:
+                pass
+        
+        def update_salary_date_1(e):
+            try:
+                new_value = int(e.control.value)
+                self.finance_app.data["salary_dates"][0] = new_value
+                self.finance_app.save_data()
+                self.page.update()
+            except:
+                pass
+        
+        def update_salary_date_2(e):
+            try:
+                new_value = int(e.control.value)
+                self.finance_app.data["salary_dates"][1] = new_value
+                self.finance_app.save_data()
+                self.page.update()
+            except:
+                pass
+        
+        return ft.Column([
+            ft.Text(f"Размер зарплаты: {salary:,.0f} ₽", size=14),
+            ft.TextField(
+                value=str(salary),
+                label="Зарплата (₽)",
+                on_change=update_salary,
+                width=200
+            ),
+            ft.Divider(),
+            ft.Text("Даты выплаты зарплаты:", size=14),
+            ft.Row([
+                ft.Text("Первая выплата:", size=12),
+                ft.Slider(
+                    min=1,
+                    max=31,
+                    value=salary_dates[0],
+                    divisions=30,
+                    width=150,
+                    on_change=update_salary_date_1
+                ),
+                ft.Text(f"{salary_dates[0]} число", size=12)
+            ]),
+            ft.Row([
+                ft.Text("Вторая выплата:", size=12),
+                ft.Slider(
+                    min=1,
+                    max=31,
+                    value=salary_dates[1],
+                    divisions=30,
+                    width=150,
+                    on_change=update_salary_date_2
+                ),
+                ft.Text(f"{salary_dates[1]} число", size=12)
+            ])
+        ], spacing=10)
+    
+    def create_appearance_settings(self):
+        theme = self.finance_app.data["settings"]["theme"]
+        currency = self.finance_app.data["settings"]["currency"]
+        
+        def update_theme(e):
+            new_theme = e.control.value
+            self.finance_app.data["settings"]["theme"] = new_theme
+            self.page.theme_mode = ft.ThemeMode.LIGHT if new_theme == "light" else ft.ThemeMode.DARK
+            self.finance_app.save_data()
+            self.page.update()
+        
+        def update_currency(e):
+            new_currency = e.control.value
+            self.finance_app.data["settings"]["currency"] = new_currency
+            self.finance_app.save_data()
+            self.page.update()
+        
+        return ft.Column([
+            ft.Text("Тема приложения:", size=14),
+            ft.RadioGroup(
+                content=ft.Column([
+                    ft.Radio(value="light", label="Светлая"),
+                    ft.Radio(value="dark", label="Темная")
+                ]),
+                value=theme,
+                on_change=update_theme
+            ),
+            ft.Divider(),
+            ft.Text("Валюта:", size=14),
+            ft.Dropdown(
+                value=currency,
+                options=[
+                    ft.dropdown.Option("RUB", "Рубль (₽)"),
+                    ft.dropdown.Option("USD", "Доллар ($)"),
+                    ft.dropdown.Option("EUR", "Евро (€)")
+                ],
+                on_change=update_currency,
+                width=200
+            )
+        ], spacing=10)
+    
+    def create_notification_settings(self):
+        notifications = self.finance_app.data["settings"]["notifications"]
+        
+        def update_notification(setting, value):
+            self.finance_app.data["settings"]["notifications"][setting] = value
+            self.finance_app.save_data()
+            self.page.update()
+        
+        return ft.Column([
+            ft.Checkbox(
+                label="Напоминание о зарплате",
+                value=notifications["salary_reminder"],
+                on_change=lambda e: update_notification("salary_reminder", e.control.value)
+            ),
+            ft.Checkbox(
+                label="Предупреждение о превышении бюджета",
+                value=notifications["budget_warning"],
+                on_change=lambda e: update_notification("budget_warning", e.control.value)
+            ),
+            ft.Checkbox(
+                label="Напоминание о целях",
+                value=notifications["goal_reminder"],
+                on_change=lambda e: update_notification("goal_reminder", e.control.value)
+            ),
+            ft.Checkbox(
+                label="Напоминание о днях рождения",
+                value=notifications["birthday_reminder"],
+                on_change=lambda e: update_notification("birthday_reminder", e.control.value)
+            )
+        ], spacing=10)
+    
+    def create_holiday_settings(self):
+        if "holiday_settings" not in self.finance_app.data["settings"]:
+            self.finance_app.data["settings"]["holiday_settings"] = {
+                "holidays": {
+                    "Новый год": {"enabled": True, "budget": 20000, "multiplier": 2.0},
+                    "8 Марта": {"enabled": True, "budget": 5000, "multiplier": 1.5},
+                    "23 Февраля": {"enabled": True, "budget": 3000, "multiplier": 1.2},
+                    "День Святого Валентина": {"enabled": True, "budget": 8000, "multiplier": 1.8},
+                    "Пасха": {"enabled": True, "budget": 2000, "multiplier": 1.0},
+                    "День Победы": {"enabled": True, "budget": 1000, "multiplier": 1.0},
+                    "День России": {"enabled": True, "budget": 1000, "multiplier": 1.0},
+                    "День народного единства": {"enabled": True, "budget": 1000, "multiplier": 1.0}
+                },
+                "special_dates": {
+                    "Годовщина отношений": {"enabled": True, "budget": 10000, "multiplier": 1.5},
+                    "День свадьбы": {"enabled": True, "budget": 15000, "multiplier": 2.0},
+                    "День рождения партнера": {"enabled": True, "budget": 8000, "multiplier": 1.5}
+                }
+            }
+            self.finance_app.save_data()
+        
+        holiday_settings = self.finance_app.data["settings"]["holiday_settings"]
+        
+        def update_holiday_budget(holiday, value):
+            try:
+                new_value = float(value)
+                self.finance_app.data["settings"]["holiday_settings"]["holidays"][holiday]["budget"] = new_value
+                self.finance_app.save_data()
+                self.page.update()
+            except:
+                pass
+        
+        def update_holiday_multiplier(holiday, value):
+            try:
+                new_value = float(value)
+                self.finance_app.data["settings"]["holiday_settings"]["holidays"][holiday]["multiplier"] = new_value
+                self.finance_app.save_data()
+                self.page.update()
+            except:
+                pass
+        
+        def toggle_holiday(holiday, value):
+            self.finance_app.data["settings"]["holiday_settings"]["holidays"][holiday]["enabled"] = value
+            self.finance_app.save_data()
+            self.page.update()
+        
+        def update_special_date_budget(date, value):
+            try:
+                new_value = float(value)
+                self.finance_app.data["settings"]["holiday_settings"]["special_dates"][date]["budget"] = new_value
+                self.finance_app.save_data()
+                self.page.update()
+            except:
+                pass
+        
+        def update_special_date_multiplier(date, value):
+            try:
+                new_value = float(value)
+                self.finance_app.data["settings"]["holiday_settings"]["special_dates"][date]["multiplier"] = new_value
+                self.finance_app.save_data()
+                self.page.update()
+            except:
+                pass
+        
+        def toggle_special_date(date, value):
+            self.finance_app.data["settings"]["holiday_settings"]["special_dates"][date]["enabled"] = value
+            self.finance_app.save_data()
+            self.page.update()
+        
+        holiday_controls = []
+        for holiday, settings in holiday_settings["holidays"].items():
+            holiday_controls.append(
+                ft.Card(
+                    content=ft.Container(
+                        content=ft.Column([
+                            ft.Row([
+                                ft.Checkbox(
+                                    label=holiday,
+                                    value=settings["enabled"],
+                                    on_change=lambda e, h=holiday: toggle_holiday(h, e.control.value)
+                                ),
+                                ft.Text(f"Бюджет: {settings['budget']:,.0f} ₽", size=12),
+                                ft.Text(f"Множитель: {settings['multiplier']:.1f}x", size=12)
+                            ]),
+                            ft.Row([
+                                ft.TextField(
+                                    value=str(settings["budget"]),
+                                    label="Бюджет (₽)",
+                                    on_change=lambda e, h=holiday: update_holiday_budget(h, e.control.value),
+                                    width=120
+                                ),
+                                ft.Slider(
+                                    min=0.5,
+                                    max=3.0,
+                                    value=settings["multiplier"],
+                                    divisions=25,
+                                    width=150,
+                                    on_change=lambda e, h=holiday: update_holiday_multiplier(h, e.control.value)
+                                )
+                            ])
+                        ], spacing=5),
+                        padding=10
+                    )
+                )
+            )
+        
+        special_date_controls = []
+        for date, settings in holiday_settings["special_dates"].items():
+            special_date_controls.append(
+                ft.Card(
+                    content=ft.Container(
+                        content=ft.Column([
+                            ft.Row([
+                                ft.Checkbox(
+                                    label=date,
+                                    value=settings["enabled"],
+                                    on_change=lambda e, d=date: toggle_special_date(d, e.control.value)
+                                ),
+                                ft.Text(f"Бюджет: {settings['budget']:,.0f} ₽", size=12),
+                                ft.Text(f"Множитель: {settings['multiplier']:.1f}x", size=12)
+                            ]),
+                            ft.Row([
+                                ft.TextField(
+                                    value=str(settings["budget"]),
+                                    label="Бюджет (₽)",
+                                    on_change=lambda e, d=date: update_special_date_budget(d, e.control.value),
+                                    width=120
+                                ),
+                                ft.Slider(
+                                    min=0.5,
+                                    max=3.0,
+                                    value=settings["multiplier"],
+                                    divisions=25,
+                                    width=150,
+                                    on_change=lambda e, d=date: update_special_date_multiplier(d, e.control.value)
+                                )
+                            ])
+                        ], spacing=5),
+                        padding=10
+                    )
+                )
+            )
+        
+        return ft.Column([
+            ft.Text("Праздничные дни:", size=14, weight=ft.FontWeight.BOLD),
+            *holiday_controls,
+            
+            ft.Divider(),
+            
+            ft.Text("Особые даты:", size=14, weight=ft.FontWeight.BOLD),
+            *special_date_controls,
+            
+            ft.Text("Множитель применяется к базовому проценту подарков", 
+                   size=12, color=ft.Colors.GREY_600)
+        ], spacing=10)
     
     def get_salary_status(self):
         current_day = datetime.now().day
