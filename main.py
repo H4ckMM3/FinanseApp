@@ -5007,6 +5007,16 @@ class MainApp:
             ft.Card(
                 content=ft.Container(
                     content=ft.Column([
+                        ft.Text("💰 Детальный прогноз по периодам зарплаты", size=18, weight=ft.FontWeight.BOLD),
+                        self.create_detailed_salary_periods_forecast()
+                    ], spacing=10),
+                    padding=20
+                )
+            ),
+            
+            ft.Card(
+                content=ft.Container(
+                    content=ft.Column([
                         ft.Text("🎄 Праздники и подарки", size=18, weight=ft.FontWeight.BOLD),
                         self.create_holidays_forecast()
                     ], spacing=10),
@@ -6545,6 +6555,8 @@ class MainApp:
                           size=12, color=ft.Colors.RED)
     
     def create_monthly_forecast(self):
+        # Получаем актуальные данные из вкладки "Деньги"
+        self.finance_app.load_data()  # Загружаем актуальные данные
         current_money = self.finance_app.data["current_money"]
         salary = self.finance_app.data["salary"]
         safety_reserve = self.finance_app.data["safety_reserve"]
@@ -6869,6 +6881,268 @@ class MainApp:
                 border=ft.border.all(1, ft.Colors.BLUE_200)
             )
         ], spacing=5)
+    
+    def create_detailed_salary_periods_forecast(self):
+        # Получаем актуальные данные из вкладки "Деньги"
+        self.finance_app.load_data()  # Загружаем актуальные данные
+        current_money = self.finance_app.data["current_money"]
+        salary = self.finance_app.data["salary"]
+        safety_reserve = self.finance_app.data["safety_reserve"]
+        monthly_expenses = self.calculate_average_monthly_expenses()
+        chatgpt_cost = 3000 if self.finance_app.data["chatgpt_enabled"] else 0
+        salary_dates = self.finance_app.data["salary_dates"]
+        
+        rent_paid_until = self.finance_app.data.get("rent_paid_until", "")
+        rent_cost = self.finance_app.data.get("rent_cost", 25000)
+        
+        def should_pay_rent(month, year):
+            if not rent_paid_until:
+                return True
+            try:
+                paid_until = datetime.strptime(rent_paid_until, "%Y-%m-%d")
+                target_date = datetime(year, month, 10)
+                should_pay = target_date >= paid_until
+                return should_pay
+            except:
+                return True
+        
+        holidays = {
+            1: {"name": "", "cost": 0, "description": ""},
+            2: {"name": "День Святого Валентина", "cost": 5000, "description": "Подарок девушке, ужин"},
+            3: {"name": "8 Марта", "cost": 3000, "description": "Подарок маме и девушке"},
+            12: {"name": "Новый год", "cost": 20000, "description": "Подарки, еда, празднование"}
+        }
+        
+        birthdays = self.finance_app.data["birthdays"]
+        for birthday in birthdays:
+            month = self.convert_month_to_int(birthday["month"])
+            if month not in holidays:
+                holidays[month] = {"name": f"ДР {birthday['name']}", "cost": birthday["cost"], "description": f"Подарок на день рождения {birthday['name']}"}
+            else:
+                holidays[month]["cost"] += birthday["cost"]
+                holidays[month]["name"] += f" + ДР {birthday['name']}"
+        
+        current_month = datetime.now().month
+        current_year = 2025
+        balance = current_money
+        
+        # Сначала получаем данные из основной таблицы прогноза
+        monthly_forecast_data = []
+        temp_balance = current_money
+        
+        for i in range(12):
+            month = ((current_month - 1 + i) % 12) + 1
+            forecast_year = current_year + ((current_month - 1 + i) // 12)
+            
+            # Используем ту же логику расчета доходов и расходов, что и в основной таблице
+            if i == 0:  # Текущий месяц
+                current_day = datetime.now().day
+                current_month_actual = datetime.now().month
+                current_year_actual = datetime.now().year
+                
+                forecast_month = ((current_month - 1 + i) % 12) + 1
+                forecast_year = current_year + ((current_month - 1 + i) // 12)
+                
+                if forecast_month == current_month_actual and forecast_year == current_year_actual:
+                    import calendar
+                    days_in_month = calendar.monthrange(current_year_actual, current_month_actual)[1]
+                    
+                    if current_day >= days_in_month - 2:
+                        income = 0
+                        holiday_cost = holidays.get(month, {}).get("cost", 0)
+                        rent_for_month = rent_cost if should_pay_rent(month, forecast_year) else 0
+                        expenses = chatgpt_cost + holiday_cost + rent_for_month
+                    elif current_day >= salary_dates[1]:
+                        income = 0
+                        holiday_cost = holidays.get(month, {}).get("cost", 0)
+                        rent_for_month = rent_cost if should_pay_rent(month, forecast_year) else 0
+                        expenses = monthly_expenses + chatgpt_cost + rent_for_month + holiday_cost
+                    elif current_day >= salary_dates[0]:
+                        income = salary / 2
+                        holiday_cost = holidays.get(month, {}).get("cost", 0)
+                        rent_for_month = rent_cost if should_pay_rent(month, forecast_year) else 0
+                        expenses = monthly_expenses + chatgpt_cost + rent_for_month + holiday_cost
+                    else:
+                        income = salary
+                        holiday_cost = holidays.get(month, {}).get("cost", 0)
+                        rent_for_month = rent_cost if should_pay_rent(month, forecast_year) else 0
+                        expenses = monthly_expenses + chatgpt_cost + rent_for_month + holiday_cost
+                else:
+                    income = salary
+                    holiday_cost = holidays.get(month, {}).get("cost", 0)
+                    rent_for_month = rent_cost if should_pay_rent(month, forecast_year) else 0
+                    expenses = monthly_expenses + chatgpt_cost + rent_for_month + holiday_cost
+            else:  # Будущие месяцы
+                income = salary
+                holiday_cost = holidays.get(month, {}).get("cost", 0)
+                rent_for_month = rent_cost if should_pay_rent(month, forecast_year) else 0
+                expenses = monthly_expenses + chatgpt_cost + rent_for_month + holiday_cost
+            
+            temp_balance += income - expenses
+            monthly_forecast_data.append({
+                "month": month,
+                "year": forecast_year,
+                "income": income,
+                "expenses": expenses,
+                "holiday_cost": holiday_cost,
+                "rent_cost": rent_for_month,
+                "balance": temp_balance
+            })
+        
+        # Теперь создаем детальную разбивку по периодам
+        periods_forecast = []
+        balance = current_money  # Начинаем с текущего баланса
+        
+        for i in range(24):
+            month_idx = i // 2
+            month_data = monthly_forecast_data[month_idx]
+            month = month_data["month"]
+            forecast_year = month_data["year"]
+            month_name = ["", "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
+                         "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"][month]
+            
+            is_even_period = i % 2 == 0
+            period_name = f"{month_name} {forecast_year}"
+            
+            if is_even_period:
+                period_dates = f"8-22 число"
+                period_income = salary / 2
+                period_expenses = monthly_expenses / 2
+                period_holiday_cost = month_data["holiday_cost"] / 2
+                period_rent_cost = month_data["rent_cost"]  # Квартплата оплачивается сразу в начале месяца
+                period_chatgpt_cost = chatgpt_cost  # ChatGPT оплачивается сразу в начале месяца
+            else:
+                period_dates = f"22-{8} число"
+                period_income = salary / 2
+                period_expenses = monthly_expenses / 2
+                period_holiday_cost = month_data["holiday_cost"] / 2
+                period_rent_cost = 0  # Квартплата уже оплачена в первом периоде
+                period_chatgpt_cost = 0  # ChatGPT уже оплачен в первом периоде
+            
+            total_expenses = period_expenses + period_chatgpt_cost + period_holiday_cost + period_rent_cost
+            period_balance = balance + period_income - total_expenses
+            
+            periods_forecast.append({
+                "period": period_name,
+                "dates": period_dates,
+                "current_money": balance,  # Текущие деньги в начале периода
+                "income": period_income,
+                "expenses": period_expenses,
+                "chatgpt_cost": period_chatgpt_cost,
+                "holiday_cost": period_holiday_cost,
+                "rent_cost": period_rent_cost,
+                "total_expenses": total_expenses,
+                "balance": period_balance,
+                "is_even": is_even_period
+            })
+            
+            balance = period_balance  # Обновляем баланс для следующего периода
+            
+            # Проверяем, что баланс в конце месяца совпадает с основной таблицей
+            if not is_even_period:  # Конец месяца (второй период)
+                expected_month_balance = month_data["balance"]
+                if abs(balance - expected_month_balance) > 1:  # Допускаем небольшую погрешность
+                    # Корректируем баланс, чтобы он совпадал с основной таблицей
+                    balance = expected_month_balance
+                    periods_forecast[-1]["balance"] = balance
+        
+        return ft.Column([
+            ft.Text("📅 Детальный прогноз по периодам зарплаты", size=18, weight=ft.FontWeight.BOLD),
+            ft.Text("Показывает детальную разбивку расходов в каждом периоде между получением зарплаты", size=12, color=ft.Colors.GREY_600),
+            ft.Text(f"💰 Начинаем с текущего баланса: {current_money:,.0f} ₽", size=12, color=ft.Colors.GREEN, weight=ft.FontWeight.BOLD),
+            ft.Text("• 8-22 число: период после аванса (25,000 ₽) • 22-8 число: период после основной зарплаты (25,000 ₽)", size=11, color=ft.Colors.BLUE_600),
+            ft.Text("• ChatGPT (3,000 ₽) и квартплата оплачиваются сразу в начале месяца (8-22 число)", size=11, color=ft.Colors.ORANGE_600),
+            
+            ft.Container(
+                content=ft.Column([
+                    ft.Row([
+                        ft.Text("Период", size=12, weight=ft.FontWeight.BOLD, expand=2),
+                        ft.Text("Даты", size=12, weight=ft.FontWeight.BOLD, expand=1),
+                        ft.Text("Текущие деньги", size=12, weight=ft.FontWeight.BOLD, expand=1),
+                        ft.Text("Доход", size=12, weight=ft.FontWeight.BOLD, expand=1),
+                        ft.Text("Базовые расходы", size=12, weight=ft.FontWeight.BOLD, expand=1),
+                        ft.Text("ChatGPT", size=12, weight=ft.FontWeight.BOLD, expand=1),
+                        ft.Text("Праздник", size=12, weight=ft.FontWeight.BOLD, expand=1),
+                        ft.Text("Квартплата", size=12, weight=ft.FontWeight.BOLD, expand=1),
+                        ft.Text("Итого расход", size=12, weight=ft.FontWeight.BOLD, expand=1),
+                        ft.Text("Баланс", size=12, weight=ft.FontWeight.BOLD, expand=1),
+                        ft.Text("Свободно", size=12, weight=ft.FontWeight.BOLD, expand=1)
+                    ], spacing=2),
+                    
+                    ft.Divider(),
+                    
+                    *[ft.Container(
+                        content=ft.Row([
+                            ft.Text(forecast["period"], size=11, expand=2, color=ft.Colors.BLUE_700 if forecast["is_even"] else ft.Colors.PURPLE_700),
+                            ft.Text(forecast["dates"], size=11, expand=1),
+                            ft.Text(f"{forecast['current_money']:,.0f}", size=11, color=ft.Colors.BLUE, expand=1),
+                            ft.Text(f"{forecast['income']:,.0f}", size=11, color=ft.Colors.GREEN, expand=1),
+                            ft.Text(f"{forecast['expenses']:,.0f}", size=11, color=ft.Colors.RED, expand=1),
+                            ft.Text(f"{forecast['chatgpt_cost']:,.0f}", size=11, color=ft.Colors.BLUE, expand=1),
+                            ft.Text(f"{forecast['holiday_cost']:,.0f}", size=11, color=ft.Colors.PURPLE, expand=1),
+                            ft.Text(f"{forecast['rent_cost']:,.0f}", size=11, color=ft.Colors.ORANGE, expand=1),
+                            ft.Text(f"{forecast['total_expenses']:,.0f}", size=11, color=ft.Colors.RED, expand=1),
+                            ft.Text(f"{forecast['balance']:,.0f}", size=11, 
+                                   color=ft.Colors.GREEN if forecast['balance'] > 0 else ft.Colors.RED, expand=1),
+                            ft.Text(f"{forecast['balance'] - safety_reserve:,.0f}" if forecast['balance'] > safety_reserve else 
+                                   f"-{safety_reserve - forecast['balance']:,.0f}", 
+                                   size=11, color=ft.Colors.GREEN if forecast['balance'] > safety_reserve else ft.Colors.RED, expand=1)
+                        ], spacing=2),
+                        bgcolor=ft.Colors.BLUE_50 if forecast["is_even"] else ft.Colors.PURPLE_50,
+                        padding=8,
+                        border=ft.border.all(0.5, ft.Colors.BLUE_200 if forecast["is_even"] else ft.Colors.PURPLE_200)
+                    ) for forecast in periods_forecast]
+                ], spacing=2),
+                padding=10,
+                bgcolor=ft.Colors.WHITE,
+                border_radius=8,
+                border=ft.border.all(1, ft.Colors.GREY_300)
+            ),
+            
+            ft.Divider(),
+            
+            ft.Container(
+                content=ft.Column([
+                    ft.Text("📊 Статистика по периодам:", size=16, weight=ft.FontWeight.BOLD),
+                    
+                    ft.Row([
+                        ft.Column([
+                            ft.Text("🏆 Лучший период:", size=14, weight=ft.FontWeight.BOLD, color=ft.Colors.GREEN),
+                            ft.Text(f"{max(periods_forecast, key=lambda x: x['balance'])['period']} ({max(periods_forecast, key=lambda x: x['balance'])['dates']})", size=12, color=ft.Colors.GREEN),
+                            ft.Text(f"Баланс: {max(periods_forecast, key=lambda x: x['balance'])['balance']:,.0f} ₽", size=11, color=ft.Colors.GREEN)
+                        ], expand=1),
+                        
+                        ft.Column([
+                            ft.Text("⚠️ Сложный период:", size=14, weight=ft.FontWeight.BOLD, color=ft.Colors.RED),
+                            ft.Text(f"{min(periods_forecast, key=lambda x: x['balance'])['period']} ({min(periods_forecast, key=lambda x: x['balance'])['dates']})", size=12, color=ft.Colors.RED),
+                            ft.Text(f"Баланс: {min(periods_forecast, key=lambda x: x['balance'])['balance']:,.0f} ₽", size=11, color=ft.Colors.RED)
+                        ], expand=1)
+                    ], spacing=20),
+                    
+                    ft.Divider(),
+                    
+                    ft.Text("💰 Общая статистика:", size=14, weight=ft.FontWeight.BOLD),
+                    ft.Text(f"• Общий доход за все периоды: {sum(f['income'] for f in periods_forecast):,.0f} ₽", size=12, color=ft.Colors.GREEN),
+                    ft.Text(f"• Общие расходы за все периоды: {sum(f['total_expenses'] for f in periods_forecast):,.0f} ₽", size=12, color=ft.Colors.RED),
+                    ft.Text(f"• На праздники за все периоды: {sum(f['holiday_cost'] for f in periods_forecast):,.0f} ₽", size=12, color=ft.Colors.PURPLE),
+                    ft.Text(f"• На квартплату за все периоды: {sum(f['rent_cost'] for f in periods_forecast):,.0f} ₽", size=12, color=ft.Colors.ORANGE),
+                    ft.Text(f"• Итоговый баланс: {periods_forecast[-1]['balance']:,.0f} ₽", size=12, 
+                           color=ft.Colors.GREEN if periods_forecast[-1]['balance'] > 0 else ft.Colors.RED),
+                    
+                    ft.Divider(),
+                    
+                    ft.Text("💡 Рекомендации:", size=14, weight=ft.FontWeight.BOLD),
+                    ft.Text("• Следите за балансом в каждом периоде", size=12),
+                    ft.Text("• Планируйте крупные покупки на периоды с высоким балансом", size=12),
+                    ft.Text("• Откладывайте деньги на праздники заранее", size=12),
+                    ft.Text("• Контролируйте расходы в сложные периоды", size=12)
+                ], spacing=8),
+                padding=15,
+                bgcolor=ft.Colors.LIGHT_BLUE_50,
+                border_radius=8,
+                border=ft.border.all(1, ft.Colors.BLUE_200)
+            )
+        ], spacing=10)
     
     def create_holidays_forecast(self):
         holidays = {
